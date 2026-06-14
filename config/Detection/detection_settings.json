@@ -1,0 +1,11 @@
+{
+    "detection": {
+        "board_sequence_plugins_path": "config/Detection/board_sequence_plugins.json",
+        "detection_params_path": "config/Detection/detection_params.json",
+        "image_source": "file",
+        "single_board_plugins_path": "config/Detection/single_board_plugins.json",
+        "draw_board": true,
+        "draw_marks": true,
+        "draw_WCS": true
+    }
+}

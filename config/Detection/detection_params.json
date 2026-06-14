@@ -1,0 +1,26 @@
+{
+    "board_detection": {
+        "chessboard": {
+            "adaptive_threshold": false,
+            "allow_larger_boards": false,
+            "filter_quads": false,
+            "normalize_image": false,
+            "search_accuracy": "balanced",
+            "square_size": 30.0,
+            "subpixel_accuracy": false
+        },
+        "circleboard": {
+            "center_distance": 10.0,
+            "mark_diameter": 5.0,
+            "use_clustering": false
+        },
+        "pattern_cols": 7,
+        "pattern_rows": 7,
+        "pattern_type": "symmetric_circles"
+    },
+    "pre_processing": {
+        "mirror_x": false,
+        "mirror_y": false,
+        "rotate": 0
+    }
+}

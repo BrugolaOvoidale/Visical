@@ -1,0 +1,11 @@
+{
+    "calibration": {
+        "board_sequence_plugins_path": "config/Calibration/board_sequence_plugins.json",
+        "calibration_params_path": "config/Calibration/calibration_params.json",
+        "single_board_plugins_path": "config/Calibration/single_board_plugins.json",
+		"auto_calibration_on_new_dataset": true,
+		"draw_board": true,
+        "draw_marks": true,
+        "draw_WCS": true
+    }
+}

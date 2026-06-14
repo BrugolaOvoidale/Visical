@@ -1,0 +1,26 @@
+[
+    {
+        "id": "max_reproj_error",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "max_reproj_error": {
+                "max_error": {
+                    "value": 2.0
+                }
+            }
+        }
+    },
+    {
+        "id": "RMS_reproj_error",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "RMS_reproj_error": {
+                "max_rms_error": {
+                    "value": 1.0
+                }
+            }
+        }
+    }
+]

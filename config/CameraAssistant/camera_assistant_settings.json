@@ -1,0 +1,8 @@
+{
+    "discovery": {
+        "camera_list_path": "config/camera_list_W.json",
+        "camera_source": "enumeration",
+        "discovery_behaviour": "none",
+        "auto_discovery": true
+    }
+}

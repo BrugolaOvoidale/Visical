@@ -1,0 +1,6 @@
+{
+    "setup": {
+        "setup_params_path": "config/Setup/setup_params.json",
+		"calibration_mode": "automatic"
+    }
+}

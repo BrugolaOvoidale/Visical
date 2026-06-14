@@ -1,0 +1,95 @@
+[
+    {
+        "id": "overexposure",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "overexposure": {
+                "min_threshold": {
+                    "value": 240
+                },
+                "max_threshold": {
+                    "value": 255
+                },
+                "max_area_ratio": {
+                    "value": 0.15
+                }
+            }
+        }
+    },
+    {
+        "id": "focus",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "focus": {
+                "min_marks_count": {
+                    "value": 4
+                },
+                "mark_dilation_radius": {
+                    "value": 5.5
+                },
+                "sigma": {
+                    "value": 0.7
+                },
+                "gradient_scaling_factor": {
+                    "value": 4.5
+                },
+                "gradient_percentile_divisor": {
+                    "value": 20.0
+                },
+                "min_score_offset": {
+                    "value": 0.25
+                }
+            }
+        }
+    },
+    {
+        "id": "contrast",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "contrast": {
+                "mark_dilation_radius": {
+                    "value": 5.5
+                },
+                "min_detectable_contrast": {
+                    "value": 50
+                },
+                "sufficient_contrast_threshold": {
+                    "value": 150
+                }
+            }
+        }
+    },
+    {
+        "id": "illumination",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "illumination": {
+                "mark_dilation_radius": {
+                    "value": 5.5
+                },
+                "intensity_deviation_scale": {
+                    "value": 40.0
+                },
+                "score_offset_factor": {
+                    "value": 1.0
+                }
+            }
+        }
+    },
+    {
+        "id": "board_size",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "board_size": {
+                "expected_coverage": {
+                    "value": 0.15
+                }
+            }
+        }
+    }
+]

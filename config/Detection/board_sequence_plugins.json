@@ -1,0 +1,71 @@
+[
+    {
+        "id": "fov_coverage",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "fov_coverage": {
+                "border_exclusion_ratio": {
+                    "value": 0.067
+                },
+                "coverage_normalization_factor": {
+                    "value": 2.5
+                },
+                "min_coverage_threshold": {
+                    "value": 0.3
+                },
+                "max_coverage_threshold": {
+                    "value": 0.85
+                }
+            }
+        }
+    },
+    {
+        "id": "images_count",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "images_count": {
+                "min_image_count": {
+                    "value": 20
+                }
+            }
+        }
+    },
+    {
+        "id": "images_size",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {}
+    },
+    {
+        "id": "tilt",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "tilt": {
+                "max_angle_cap": {
+                    "value": 75.0
+                },
+                "angle_scaling_target": {
+                    "value": 90.0
+                },
+                "score_exponent": {
+                    "value": 90.0
+                },
+                "score_adjustment_multiplier": {
+                    "value": 1.05
+                },
+                "min_image_count": {
+                    "value": 4
+                },
+                "slant_weight": {
+                    "value": 0.5
+                },
+                "pan_weight": {
+                    "value": 0.5
+                }
+            }
+        }
+    }
+]

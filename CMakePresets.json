@@ -1,0 +1,173 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base-clang",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "environment": {
+        "CXXFLAGS": "",
+        "CFLAGS": ""
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang-cl",
+        "CMAKE_CXX_COMPILER": "clang-cl",
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "WITH_GENICAM": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-windows"
+      },
+      "vendor": {
+        "microsoft.com/VisualStudioSettings/CMake/1.0": {
+          "hostOS": [ "Windows" ],
+          "intelliSenseMode": "windows-msvc-x64",
+          "intelliSenseOptions": {
+            "useCompilerDefaults": false
+          }
+        }
+      }
+    },
+	{
+	  "name": "base-clang-no-genicam",
+	  "hidden": true,
+	  "generator": "Ninja",
+	  "binaryDir": "${sourceDir}/build/${presetName}",
+	  "environment": {
+		"CXXFLAGS": "",
+		"CFLAGS": ""
+	  },
+	  "cacheVariables": {
+		"CMAKE_C_COMPILER": "clang-cl",
+		"CMAKE_CXX_COMPILER": "clang-cl",
+		"CMAKE_CXX_STANDARD": "23",
+		"CMAKE_CXX_STANDARD_REQUIRED": "ON",
+		"CMAKE_CXX_EXTENSIONS": "OFF",
+		"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+		"WITH_GENICAM": "OFF",
+		"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+		"VCPKG_TARGET_TRIPLET": "x64-windows"
+	  },
+		"vendor": {
+			"microsoft.com/VisualStudioSettings/CMake/1.0": {
+				"hostOS": [ "Windows" ],
+				"intelliSenseMode": "windows-msvc-x64",
+				"intelliSenseOptions": {
+					"useCompilerDefaults": false
+				}
+			}
+		}
+	},
+    {
+      "name": "base-linux-clang",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "environment": {
+        "CXXFLAGS": "",
+        "CFLAGS": ""
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_STANDARD": "23",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_CXX_EXTENSIONS": "OFF",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "WITH_GENICAM": "ON",
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_TARGET_TRIPLET": "x64-linux"
+      },
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+	{
+	  "name": "base-linux-clang-no-genicam",
+	  "hidden": true,
+	  "generator": "Ninja",
+	  "binaryDir": "${sourceDir}/build/${presetName}",
+	  "environment": {
+		"CXXFLAGS": "",
+		"CFLAGS": ""
+	  },
+	  "cacheVariables": {
+		"CMAKE_C_COMPILER": "clang",
+		"CMAKE_CXX_COMPILER": "clang++",
+		"CMAKE_CXX_STANDARD": "23",
+		"CMAKE_CXX_STANDARD_REQUIRED": "ON",
+		"CMAKE_CXX_EXTENSIONS": "OFF",
+		"CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+		"WITH_GENICAM": "OFF",
+		"CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+		"VCPKG_TARGET_TRIPLET": "x64-linux"
+	  },
+	  "condition": {
+		"type": "equals",
+		"lhs": "${hostSystemName}",
+		"rhs": "Linux"
+	  }
+	},
+    {
+      "name": "x64-debug-clang",
+      "displayName": "x64 Debug - Clang",
+      "inherits": "base-clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "x64-release-clang",
+      "displayName": "x64 Release - Clang",
+      "inherits": "base-clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+	{
+	  "name": "x64-debug-clang-no-genicam",
+	  "displayName": "x64 Debug - Clang (No GenICam)",
+	  "inherits": "base-clang-no-genicam",
+	  "cacheVariables": {
+		"CMAKE_BUILD_TYPE": "Debug"
+	  }
+	},
+	{
+	  "name": "x64-release-clang-no-genicam",
+	  "displayName": "x64 Release - Clang (No GenICam)",
+	  "inherits": "base-clang-no-genicam",
+	  "cacheVariables": {
+		"CMAKE_BUILD_TYPE": "Release"
+	  }
+	},
+    {
+      "name": "linux-debug-clang",
+      "displayName": "Linux Debug - Clang",
+      "inherits": "base-linux-clang",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "linux-release-clang",
+      "displayName": "Linux Release - Clang",
+      "inherits": "base-linux-clang",
+      "cacheVariables": {  "CMAKE_BUILD_TYPE": "Release" }
+    },
+	{
+	  "name": "linux-debug-clang-no-genicam",
+	  "displayName": "Linux Debug - Clang (No GenICam)",
+	  "inherits": "base-linux-clang-no-genicam",
+	  "cacheVariables": {
+		"CMAKE_BUILD_TYPE": "Debug"
+	  }
+	},
+	{
+	  "name": "linux-release-clang-no-genicam",
+	  "displayName": "Linux Release - Clang (No GenICam)",
+	  "inherits": "base-linux-clang-no-genicam",
+	  "cacheVariables": {
+		"CMAKE_BUILD_TYPE": "Release"
+	  }
+	}
+  ]
+}

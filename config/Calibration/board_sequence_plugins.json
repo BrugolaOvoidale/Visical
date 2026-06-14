@@ -1,0 +1,14 @@
+[
+    {
+        "id": "max_RMS_error",
+        "threshold": 70.0,
+        "enabled": true,
+        "parameters": {
+            "max_RMS_error": {
+                "max_error": {
+                    "value": 1.0
+                }
+            }
+        }
+    }
+]

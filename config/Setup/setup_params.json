@@ -1,0 +1,39 @@
+{
+    "camera": {
+        "focal_length": 12.5,
+        "focal_length_x": 1000.0,
+        "focal_length_y": 1000.0,
+        "image_height": 480,
+        "image_width": 640,
+        "pixel_pitch_height": 0.00345,
+        "pixel_pitch_width": 0.00345,
+        "principal_point_x": 728.0,
+        "principal_point_y": 544.0,
+        "skew": 0.0
+    },
+    "distortion_model": {
+        "distortion_type": "standard",
+        "rational": {
+            "k4": 0.0,
+            "k5": 0.0,
+            "k6": 0.0
+        },
+        "standard": {
+            "k1": 0.0,
+            "k2": 0.0,
+            "k3": 0.0,
+            "p1": 0.0,
+            "p2": 0.0
+        },
+        "thin_prism": {
+            "s1": 0.0,
+            "s2": 0.0,
+            "s3": 0.0,
+            "s4": 0.0
+        },
+        "tilted": {
+            "tx": 0.0,
+            "ty": 0.0
+        }
+    }
+}

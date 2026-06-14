@@ -1,0 +1,20 @@
+#include "DetectionPageEvents.hpp"
+
+
+wxDEFINE_EVENT(GUI_LOAD_IMAGE, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_SAVE_IMAGE, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_SNAP_CAMERA, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_LIVE_CAMERA, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_CHANGE_CAMERA, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_DET_REMOVE_BOARD, BoardEvent);
+
+wxDEFINE_EVENT(GUI_DET_REMOVE_ALL_BOARDS, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_ACCEPT_DATASET, wxCommandEvent);
+
+wxDEFINE_EVENT(GUI_CAMERA_ASSISTANT, wxCommandEvent);

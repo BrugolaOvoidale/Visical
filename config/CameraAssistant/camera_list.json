@@ -1,0 +1,10 @@
+{
+	"cameras": [
+        {
+            "id": "GX438968",
+            "interface": "aravis_genicam",
+			"params_persistence": false,
+            "behaviour": "none"
+        }
+    ]
+}

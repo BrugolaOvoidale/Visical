@@ -1,0 +1,17 @@
+{
+    "calibration": {
+        "fix_k1": false,
+        "fix_k2": false,
+        "fix_k3": false,
+        "fix_k4": false,
+        "fix_k5": false,
+        "fix_k6": false,
+        "fix_s1s2s3s4": false,
+        "fix_tauxtauy": false,
+        "focal_length_mode": "optimize_both",
+        "principal_point_mode": "optimize",
+        "solver_type": "svd",
+        "tangential_distortion_mode": "optimize",
+        "use_initial_guess": false
+    }
+}
