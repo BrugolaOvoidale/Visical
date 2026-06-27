@@ -24,7 +24,7 @@ public:
      */
     explicit UiTickProxy(std::function<void(void)> cb);
 
-    ~UiTickProxy() = default;
+    ~UiTickProxy();
 
 
     //-----------------------------------------------------------------------------

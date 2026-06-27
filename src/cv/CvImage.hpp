@@ -169,7 +169,7 @@ public:
      */
     CvImage rotate(
         float angle,
-        cv::InterpolationFlags interpolation = cv::InterpolationFlags::INTER_NEAREST_EXACT,
+        cv::InterpolationFlags interpolation = cv::InterpolationFlags::INTER_LINEAR,
         cv::BorderTypes borderType = cv::BorderTypes::BORDER_CONSTANT,
         const cv::Scalar& borderValue = cv::Scalar(0)
     ) const;

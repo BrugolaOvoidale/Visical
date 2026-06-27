@@ -16,7 +16,7 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 11)
 
-find_package(OpenCV CONFIG REQUIRED)
+find_package(OpenCV CONFIG REQUIRED COMPONENTS core aruco)
 find_package(wxWidgets CONFIG REQUIRED COMPONENTS core base)
 find_package(nlohmann_json CONFIG REQUIRED)
 if(WITH_GENICAM)
@@ -102,6 +102,7 @@ target_link_libraries(Visical PRIVATE
     opencv_highgui
     opencv_calib3d
     opencv_features2d
+    opencv_aruco
 	
     wx::core
     wx::base

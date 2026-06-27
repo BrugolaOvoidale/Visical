@@ -1,18 +1,100 @@
 {
     "board_detection": {
+        "aruco": {
+            "april_tag": {
+                "detection": {
+                    "april_tag_critical_rad": 0.1745329201221466,
+                    "april_tag_deglitch": 0,
+                    "april_tag_max_line_fit_mse": 10.0,
+                    "april_tag_max_nmaxima": 10,
+                    "april_tag_min_cluster_pixels": 5,
+                    "april_tag_min_white_black_diff": 5,
+                    "april_tag_quad_decimate": 0.0,
+                    "april_tag_quad_sigma": 0.0,
+                    "corner_refinement_method": "CORNER_REFINE_NONE"
+                },
+                "geometry": {
+                    "dictionary": "DICT_APRILTAG_36h11",
+                    "marker_separation": 2.4
+                }
+            },
+            "charuco": {
+                "detection": {
+                    "corner_refinement_method": "CORNER_REFINE_NONE",
+                    "min_markers": 2,
+                    "try_refine_markers": false
+                },
+                "geometry": {
+                    "dictionary": "DICT_4X4_50",
+                    "square_size": 10.0
+                }
+            },
+            "detection": {
+                "adaptive_thresh_constant": 7.0,
+                "adaptive_thresh_win_size_max": 23,
+                "adaptive_thresh_win_size_min": 3,
+                "adaptive_thresh_win_size_step": 10,
+                "corner_refinement_max_iterations": 30,
+                "corner_refinement_min_accuracy": 0.1,
+                "corner_refinement_win_size": 5,
+                "detect_inverted_marker": false,
+                "error_correction_rate": 0.6,
+                "marker_border_bits": 1,
+                "max_erroneous_bits_in_border_rate": 0.35,
+                "max_marker_perimeter_rate": 4.0,
+                "min_corner_distance_rate": 0.05,
+                "min_distance_to_border": 3,
+                "min_group_distance": 0.20999999344348907,
+                "min_marker_distance_rate": 0.125,
+                "min_marker_length_ratio_original_img": 0.0,
+                "min_marker_perimeter_rate": 0.03,
+                "min_otsu_std_dev": 5.0,
+                "min_side_length_canonical_img": 32,
+                "perspective_remove_ignored_margin_per_cell": 0.13,
+                "perspective_remove_pixel_per_cell": 4,
+                "polygonal_approx_accuracy_rate": 0.03,
+                "relative_corner_refinement_win_size": 0.30000001192092896,
+                "use_aruco3_detection": false
+            },
+            "geometry": {
+                "marker_length": 7.0
+            },
+            "refine": {
+                "check_all_orders": true,
+                "error_correction_rate": 3.0,
+                "min_rep_distance": 10.0
+            }
+        },
         "chessboard": {
-            "adaptive_threshold": false,
-            "allow_larger_boards": false,
-            "filter_quads": false,
-            "normalize_image": false,
-            "search_accuracy": "balanced",
-            "square_size": 30.0,
-            "subpixel_accuracy": false
+            "detection": {
+                "adaptive_threshold": false,
+                "allow_larger_boards": false,
+                "filter_quads": false,
+                "normalize_image": false,
+                "search_accuracy": "balanced",
+                "subpixel_accuracy": false
+            },
+            "geometry": {
+                "square_size": 10.0
+            },
+            "refine": {
+                "epsilon": 0.001,
+                "max_iterations": 30,
+                "term_criteria_type": "both",
+                "window_height": 11,
+                "window_width": 11,
+                "zero_zone_height": -1,
+                "zero_zone_width": -1
+            }
         },
         "circleboard": {
-            "center_distance": 10.0,
-            "mark_diameter": 5.0,
-            "use_clustering": false
+            "detection": {
+                "use_clustering": false
+            },
+            "geometry": {
+                "center_distance": 10.0,
+                "mark_diameter": 5.0
+            }
         },
         "pattern_cols": 7,
         "pattern_rows": 7,

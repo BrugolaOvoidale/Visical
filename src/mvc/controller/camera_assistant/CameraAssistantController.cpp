@@ -753,7 +753,7 @@ void CameraAssistantController::SetParameter(const ParameterChangedEvent& event)
             );
         }
 
-        view_->MarkParameterAsDirty(parameterId, cam->isParameterDirty(parameterId, categoryId));
+        view_->MarkParameterAsDirty(parameterId, categoryId, cam->isParameterDirty(parameterId, categoryId));
     }
 }
 
@@ -784,7 +784,7 @@ void CameraAssistantController::ResetParameter(const ParameterEvent& event)
                 cam->getParameter(parameterId, categoryId)
             );
 
-            view_->MarkParameterAsDirty(parameterId, cam->isParameterDirty(parameterId, categoryId));
+            view_->MarkParameterAsDirty(parameterId, categoryId, cam->isParameterDirty(parameterId, categoryId));
         }
     }
 

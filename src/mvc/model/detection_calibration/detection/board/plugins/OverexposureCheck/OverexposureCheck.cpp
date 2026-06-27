@@ -6,6 +6,7 @@ OverexposureCheck::OverexposureCheck(double threshold)
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        {},
         threshold)
 {
 }
@@ -24,14 +25,26 @@ std::shared_ptr<OverexposureCheck> OverexposureCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> OverexposureCheck::executeImpl(const std::shared_ptr<Board>& board) const
+std::shared_ptr<PluginResult> OverexposureCheck::executeImpl(
+    const std::shared_ptr<Board>& board,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     if (!board->isDetected())
     {
         return executionFailed("Cannot evaluate a non-detected board");
     }
 
+    const CvImage& image = board->image();
+    cv::Size imageSize = image.size();
     const CvRegion boardRegion = board->boardContour().toRegion(true);
+    cv::Rect boardRegionBB = boardRegion.boundingBox();
+
+    if (boardRegionBB.x < 0 || boardRegionBB.y < 0 ||
+        boardRegionBB.x + boardRegionBB.width  > imageSize.width ||
+        boardRegionBB.y + boardRegionBB.height > imageSize.height)
+    {
+        return executionFailed("Board region bounding box exceeds image bounds");
+    }
 
     // 1. Compute board area
     double boardArea = boardRegion.areaCenter();

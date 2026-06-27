@@ -1,17 +1,21 @@
-#include "CircleboardParamsRegistry.hpp"
+#include "CircleboardParametersRegistry.hpp"
 #include <parameter/numeric/ParameterNumeric.hpp>
 #include <parameter/bool/ParameterBool.hpp>
-#include "PatternParamsRegistry.hpp"
-#include "CircleboardParams.hpp"
+#include "PatternParametersRegistry.hpp"
+#include "CircleboardParameters.hpp"
 
 
 /////////////////////////////////////////////////////////////
 
-const std::string CircleboardParamsRegistry::CATEGORY{ PatternParamsRegistry::CATEGORY() + Parameter::CATEGORY_SEP + "circleboard" };
+const std::string CircleboardParametersRegistry::CATEGORY{ PatternParametersRegistry::CATEGORY() + Parameter::CATEGORY_SEP + "circleboard" };
+
+const std::string CircleboardParametersRegistry::CATEGORY_GEOMETRY{ CATEGORY + Parameter::CATEGORY_SEP + "geometry" };
+
+const std::string CircleboardParametersRegistry::CATEGORY_DETECTION{ CATEGORY + Parameter::CATEGORY_SEP + "detection" };
 
 /////////////////////////////////////////////////////////////
 
-CircleboardParamsRegistry::CircleboardParamsRegistry()
+CircleboardParametersRegistry::CircleboardParametersRegistry()
 	: ParameterRegistry()
 {
 	registerAllParameters();
@@ -19,16 +23,16 @@ CircleboardParamsRegistry::CircleboardParamsRegistry()
 
 /////////////////////////////////////////////////////////////
 
-void CircleboardParamsRegistry::registerAllParameters()
+void CircleboardParametersRegistry::registerAllParameters()
 {
 	// Mark diameter
 	{
 		std::shared_ptr<Parameter> aParam = ParameterDouble::create(
 			"mark_diameter",
-			CircleboardParamsRegistry::CATEGORY,
+			CircleboardParametersRegistry::CATEGORY_GEOMETRY,
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			30.0,
+			5.0,
 			0.0,
 			std::nullopt,
 			std::nullopt,
@@ -46,10 +50,10 @@ void CircleboardParamsRegistry::registerAllParameters()
 	{
 		std::shared_ptr<Parameter> aParam = ParameterDouble::create(
 			"center_distance",
-			CircleboardParamsRegistry::CATEGORY,
+			CircleboardParametersRegistry::CATEGORY_GEOMETRY,
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			30.0,
+			10.0,
 			0.0,
 			std::nullopt,
 			std::nullopt,
@@ -67,10 +71,10 @@ void CircleboardParamsRegistry::registerAllParameters()
 	{
 		std::shared_ptr<Parameter> aParam = ParameterBool::create(
 			"use_clustering",
-			CircleboardParamsRegistry::CATEGORY,
+			CircleboardParametersRegistry::CATEGORY_DETECTION,
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			CircleboardParams::Defaults::useClustering,
+			CircleboardParameters::Detection::Defaults::useClustering,
 			"Use clustering",
 			std::nullopt,
 			"Enables clustering of detected circular candidates during pattern detection. Clustering groups nearby detections to improve robustness when identifying the grid structure, particularly in noisy images or when false circle detections are present."

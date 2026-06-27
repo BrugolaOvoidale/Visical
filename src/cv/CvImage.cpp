@@ -1,4 +1,4 @@
-﻿#include "CvImage.hpp"
+#include "CvImage.hpp"
 #include <execution>
 #include <opencv2/imgcodecs.hpp>
 
@@ -265,24 +265,40 @@ CvRegion CvImage::threshold(
 
 CvImage CvImage::toBGR() const
 {
-    if (channels() == 3)
+    const int ch = channels();
+
+    if (ch == 3)
         return fromOperation(this, mat_.clone());
 
     cv::Mat bgrMat;
-    cv::cvtColor(mat_, bgrMat, cv::COLOR_GRAY2BGR, 3);
+
+    if (ch == 1)
+        cv::cvtColor(mat_, bgrMat, cv::COLOR_GRAY2BGR);
+    else if (ch == 4)
+        cv::cvtColor(mat_, bgrMat, cv::COLOR_BGRA2BGR);
+    else
+        throw std::runtime_error("Unsupported channel count: " + std::to_string(ch));
 
     return fromOperation(this, bgrMat);
 }
 
 CvImage CvImage::toGray() const
 {
-    if (channels() == 1)
+    const int ch = channels();
+
+    if (ch == 1)
         return fromOperation(this, mat_.clone());
 
-    cv::Mat grayMat;
-    cv::cvtColor(mat_, grayMat, cv::COLOR_BGR2GRAY, 1);
+    cv::Mat bgrMat;
 
-    return fromOperation(this, grayMat);
+    if (ch == 3)
+        cv::cvtColor(mat_, bgrMat, cv::COLOR_BGR2GRAY);
+    else if (ch == 4)
+        cv::cvtColor(mat_, bgrMat, cv::COLOR_BGRA2GRAY);
+    else
+        throw std::runtime_error("Unsupported channel count: " + std::to_string(ch));
+
+    return fromOperation(this, bgrMat);
 }
 
 CvImage CvImage::crop(const cv::Rect& roi) const
@@ -499,9 +515,13 @@ CvImage CvImage::scaleImageMax() const
     }
 
     cv::Mat scaled;
-    flat = (flat - static_cast<float>(minv)) / static_cast<float>(maxv - minv); // 0..1
-    flat = flat * 255.0f;
-    flat.convertTo(scaled, CV_8U);
+    srcFloat = (srcFloat - static_cast<float>(minv)) / static_cast<float>(maxv - minv); // 0..1
+    srcFloat = srcFloat * 255.0f;
+    srcFloat.convertTo(scaled, CV_8U);
+
+    // If multi-channel, collapse to CV_8UC1
+    if (scaled.channels() > 1)
+        cv::cvtColor(scaled, scaled, cv::COLOR_BGR2GRAY);
 
     return fromOperation(this, scaled);
 }

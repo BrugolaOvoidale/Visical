@@ -55,22 +55,34 @@ public:
     /**
      * @brief Retrieves a parameter widget instance by its unique identifier string.
      * @param parameterId The unique string identifier of the target parameter widget.
+     * @param categoryId The unique string identifier of the target parameter widget category.
      * @return A shared pointer to the requested ParameterWidget, or nullptr if not found.
 	 */
-    std::shared_ptr<ParameterWidget> GetWidget(const wxString& parameterId);
+    std::shared_ptr<ParameterWidget> GetWidget(
+        const wxString& parameterId,
+        const wxString& categoryId
+    );
 
     /**
      * @brief Erases a parameter widget out of the list view tracking.
-     * @param toRemoveId The unique string identifier of the item to delete.
+     * @param parameterId The unique string identifier of the item to delete.
+     * @param categoryId The unique string identifier of the target parameter widget category.
      */
-    void RemoveParameter(const wxString& toRemoveId);
+    void RemoveParameter(
+        const wxString& parameterId,
+        const wxString& categoryId
+    );
 
     /**
      * @brief Focuses or highlights a target parameter control inside the list view structure.
      * @param parameterId The target identifier to highlight.
+     * @param categoryId The unique string identifier of the target parameter widget category.
      * @return true if the requested item was found and successfully focused, false otherwise.
      */
-    bool SelectParameter(const wxString& parameterId);
+    bool SelectParameter(
+        const wxString& parameterId,
+        const wxString& categoryId
+    );
 
 private:
 	// Factory method creates a new parameter widget instance.
@@ -84,8 +96,8 @@ private:
 
 private:
     // Bidirectional shortcut mapping parameter identity directly onto target elements.
-    std::unordered_map<wxString, std::shared_ptr<ParameterWidget>> m_parameterIdtoItem;
+    std::unordered_map<wxString, std::unordered_map<wxString, std::shared_ptr<ParameterWidget>>> m_parameterIdtoItem;
 
     // Reverse proxy lookup parsing element references into identifier keys.
-    std::unordered_map<std::shared_ptr<ParameterWidget>, wxString> m_itemToParameterId;
+    std::unordered_map<wxString, std::unordered_map<std::shared_ptr<ParameterWidget>, wxString>> m_itemToParameterId;
 };

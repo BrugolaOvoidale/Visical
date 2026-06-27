@@ -380,11 +380,7 @@ double CvRegion::diameterRegionMean() const
 
     for (const auto& comp : components)
     {
-        std::vector<cv::Point> pts;
-        cv::findNonZero(comp.mask(), pts);
-
-        if (pts.empty())
-            continue;
+        std::vector<cv::Point> pts = comp.points();
 
         cv::Point2f center;
         float radius = 0.0f;
@@ -431,7 +427,86 @@ CvRegion CvRegion::dilationCircle(double radius) const
     return CvRegion(dilatedMask, expandedBounds);
 }
 
-std::vector<CvContour> CvRegion::toContours(ContourMode mode)
+CvRegion CvRegion::dilationRectangle(
+    double width,
+    double height) const
+{
+    int rw = static_cast<int>(std::ceil(width / 2.0));
+    int rh = static_cast<int>(std::ceil(height / 2.0));
+    if (mask_.empty())
+        return {};
+
+    // 1. Create structuring element
+    cv::Mat kernel = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(2 * rw + 1, 2 * rh + 1));
+
+    // 2. Pad mask asymmetrically to match the rectangular kernel extents
+    cv::Mat paddedMask;
+    cv::copyMakeBorder(
+        mask_, paddedMask,
+        rh, rh, rw, rw,
+        cv::BORDER_CONSTANT, cv::Scalar(0)
+    );
+
+    // 3. Dilate the padded mask, now free to grow into the border
+    cv::Mat dilatedMask;
+    cv::dilate(paddedMask, dilatedMask, kernel);
+
+    // 4. Expand bounding box to match the padded/dilated region
+    cv::Rect expandedBounds = boundingBox_;
+    expandedBounds.x -= rw;
+    expandedBounds.y -= rh;
+    expandedBounds.width += 2 * rw;
+    expandedBounds.height += 2 * rh;
+
+    return CvRegion(dilatedMask, expandedBounds);
+}
+
+CvRegion CvRegion::erosionRectangle(
+    double width,
+    double height) const
+{
+    int rw = static_cast<int>(std::ceil(width / 2.0));
+    int rh = static_cast<int>(std::ceil(height / 2.0));
+
+    // Safety check: if the mask is empty, or smaller than the erosion kernel, 
+    // it will completely erode away into nothing.
+    if (mask_.empty() || mask_.cols <= 2 * rw || mask_.rows <= 2 * rh)
+        return {};
+
+    // 1. Create structuring element
+    cv::Mat kernel = cv::getStructuringElement(
+        cv::MORPH_RECT,
+        cv::Size(2 * rw + 1, 2 * rh + 1));
+
+    // 2. Erode the mask
+    // We force cv::BORDER_CONSTANT with a value of 0. 
+    // This treats the outside world as background, allowing erosion to eat into the mask edges.
+    cv::Mat erodedMask;
+    cv::erode(
+        mask_, erodedMask, kernel,
+        cv::Point(-1, -1), 1,
+        cv::BORDER_CONSTANT, cv::Scalar(0)
+    );
+
+    // 3. Crop the mask to match the newly contracted region size
+    // We trim 'rw' from the left/right and 'rh' from the top/bottom
+    cv::Mat croppedMask = erodedMask(
+        cv::Rect(rw, rh, mask_.cols - 2 * rw, mask_.rows - 2 * rh)
+    ).clone();
+
+    // 4. Contract the bounding box to match the cropped region
+    cv::Rect contractedBounds = boundingBox_;
+    contractedBounds.x += rw;
+    contractedBounds.y += rh;
+    contractedBounds.width -= 2 * rw;
+    contractedBounds.height -= 2 * rh;
+
+    return CvRegion(croppedMask, contractedBounds);
+}
+
+std::vector<CvContour> CvRegion::toContours(ContourMode mode) const
 {
     if (mask_.empty())
         return {};

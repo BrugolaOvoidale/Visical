@@ -383,13 +383,14 @@ bool EvaluationPanel::SetSelectedDebPlugin(
 void EvaluationPanel::MarkPluginParameterAsDirty(
     const wxString& pluginId,
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
     std::shared_ptr<EvaluationPluginWidget> widget = m_boardPluginsList->GetWidget(pluginId);
 
     if (widget)
     {
-        widget->MarkParameterAsDirty(paramId, isDirty);
+        widget->MarkParameterAsDirty(paramId, categoryId, isDirty);
     }
 
 
@@ -397,7 +398,7 @@ void EvaluationPanel::MarkPluginParameterAsDirty(
 
     if (widget)
     {
-        widget->MarkParameterAsDirty(paramId, isDirty);
+        widget->MarkParameterAsDirty(paramId, categoryId, isDirty);
     }
 }
 

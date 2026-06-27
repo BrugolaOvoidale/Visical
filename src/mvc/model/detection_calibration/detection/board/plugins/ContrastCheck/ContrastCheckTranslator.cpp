@@ -49,15 +49,15 @@ void ContrastCheckTranslator::applyParametersToPlugin(
         }
     }
 
-    // Mark dilation radius
+    // Kernel size
     {
-        auto it = parameterMap.find("mark_dilation_radius");
+        auto it = parameterMap.find("kernel_size");
         if (it != parameterMap.end())
         {
             double newValue = it->second->getValue<double>();
-            if (newValue != contrastPlugin->markDilationRadius)
+            if (newValue != contrastPlugin->kernelSize)
             {
-                contrastPlugin->markDilationRadius = newValue;
+                contrastPlugin->kernelSize = newValue;
             }
         }
     }

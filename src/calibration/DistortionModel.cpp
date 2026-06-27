@@ -102,7 +102,7 @@ DistortionModel DistortionModel::tilted(
 
 /////////////////////////////////////////////////////////
 
-int DistortionModel::distortionTypeToCoeffsCount(DistortionModel::Type distModel)
+size_t DistortionModel::distortionTypeToCoeffsCount(DistortionModel::Type distModel)
 {
     switch (distModel)
     {
@@ -188,7 +188,7 @@ DistortionModel::Type DistortionModel::type() const
     return distType_;
 }
 
-int  DistortionModel::coeffsCount() const
+size_t DistortionModel::coeffsCount() const
 {
     return distortionTypeToCoeffsCount(distType_);
 }

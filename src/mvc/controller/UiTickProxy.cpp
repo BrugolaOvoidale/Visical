@@ -8,6 +8,15 @@ UiTickProxy::UiTickProxy(std::function<void(void)> cb)
     Bind(wxEVT_TIMER, &UiTickProxy::OnTimer, this);
 }
 
+UiTickProxy::~UiTickProxy()
+{
+    timer_.Stop();
+    
+    Unbind(wxEVT_TIMER, &UiTickProxy::OnTimer, this);
+
+    callback_ = nullptr;
+}
+
 //////////////////////////////////////////////////////
 
 void UiTickProxy::Start(int intervalMs)

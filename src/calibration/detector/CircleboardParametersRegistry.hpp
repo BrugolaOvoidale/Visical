@@ -5,14 +5,16 @@
 /**
  * @brief Registry for managing detection parameters for circleboard pattern.
  */
-class CircleboardParamsRegistry : public ParameterRegistry
+class CircleboardParametersRegistry : public ParameterRegistry
 {
 public:
 	static const std::string CATEGORY;
+	static const std::string CATEGORY_GEOMETRY;
+	static const std::string CATEGORY_DETECTION;
 
-	CircleboardParamsRegistry();
+	CircleboardParametersRegistry();
 
-	~CircleboardParamsRegistry() = default;
+	~CircleboardParametersRegistry() = default;
 
 private:
 	void registerAllParameters();

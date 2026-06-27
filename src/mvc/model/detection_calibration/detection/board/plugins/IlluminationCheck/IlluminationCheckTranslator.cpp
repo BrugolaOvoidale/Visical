@@ -23,15 +23,15 @@ void IlluminationCheckTranslator::applyParametersToPlugin(
 	for (const auto& param : parameters) parameterMap[param->name()] = param;
 
 
-    // Mark dilation radius
+    // Kernel size
     {
-        auto it = parameterMap.find("mark_dilation_radius");
+        auto it = parameterMap.find("kernel_size");
         if (it != parameterMap.end())
         {
             double newValue = it->second->getValue<double>();
-            if (newValue != illuminationPlugin->markDilationRadius)
+            if (newValue != illuminationPlugin->kernelSize)
             {
-                illuminationPlugin->markDilationRadius = newValue;
+                illuminationPlugin->kernelSize = newValue;
             }
         }
     }

@@ -3,7 +3,10 @@
 namespace DetectionView
 {
     enum class ParameterLocation {
-        Setup,
+        SetupPattern,
+        SetupGeometry,
+        SetupDetection,
+        SetupRefine,
         PreProcessing
     };
 }

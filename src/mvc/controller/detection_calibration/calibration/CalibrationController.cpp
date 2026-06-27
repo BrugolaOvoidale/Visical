@@ -356,7 +356,7 @@ void CalibrationController::ReloadParameters()
             const std::string& pName = p->name();
             const std::string& pCat = p->category();
 
-            view_->MarkParameterAsDirty(pName, model_->isParameterDirty(pName, pCat));
+            view_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
         }
     }
 }

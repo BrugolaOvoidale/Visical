@@ -97,6 +97,7 @@ public:
     /** @brief Flags a parameter visually to notify users that it has unsaved edits. */
     void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     ) override;
 

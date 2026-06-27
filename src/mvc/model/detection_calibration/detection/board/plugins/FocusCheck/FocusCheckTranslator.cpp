@@ -36,19 +36,6 @@ void FocusCheckTranslator::applyParametersToPlugin(
         }
     }
 
-    // Mark dilation radius
-    {
-        auto it = parameterMap.find("mark_dilation_radius");
-        if (it != parameterMap.end())
-        {
-            double newValue = it->second->getValue<double>();
-            if (newValue != focusPlugin->markDilationRadius)
-            {
-                focusPlugin->markDilationRadius = newValue;
-            }
-        }
-    }
-
     // Sigma
     {
         auto it = parameterMap.find("sigma");

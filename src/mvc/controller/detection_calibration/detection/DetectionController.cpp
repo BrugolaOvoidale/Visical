@@ -5,6 +5,12 @@
 #include <UtilityFunctions.hpp>
 #include <camera_manager/CameraManager.hpp>
 #include <calibration/Board.hpp>
+#include <calibration/detector/PatternParametersRegistry.hpp>
+#include <calibration/detector/ChessboardParametersRegistry.hpp>
+#include <calibration/detector/CircleboardParametersRegistry.hpp>
+#include <calibration/detector/ArucoParametersRegistry.hpp>
+#include <calibration/detector/CharucoParametersRegistry.hpp>
+#include <calibration/detector/AprilTagParametersRegistry.hpp>
 #include <mvc/model/detection_calibration/SharedCameraIntrinsics.hpp>
 #include <mvc/model/detection_calibration/detection/DetectionModelRegistry.hpp>
 #include <mvc/model/detection_calibration/detection/DetectionModel.hpp>
@@ -70,13 +76,40 @@ DetectionController::DetectionController(
 
     CalibrationStageController::init();
 
-    view_->SetParameters(model_->getDetectionParametersInfo(), DetectionView::ParameterLocation::Setup);
-    view_->SetParameters(model_->getFilteredParams(DetectionModelRegistry::CATEGORY_PRE_PROC), DetectionView::ParameterLocation::PreProcessing);
+    ReloadParameters();
 }
 
-DetectionController::~DetectionController() = default;
+DetectionController::~DetectionController()
+{
+    DetectionController::shutdown();
+}
 
 /////////////////////////////////////////////////////
+
+void DetectionController::shutdown()
+{
+    model_->unsubscribe(MSG_BOARD_FROM_IMAGE, &DetectionController::onBoardDetectionFromImage, this);
+
+    model_->unsubscribe(MSG_BOARD_FROM_SNAP, &DetectionController::onBoardDetectionFromSnap, this);
+
+    model_->unsubscribe(MSG_BOARD_FROM_LIVE, &DetectionController::onBoardFromLive, this);
+
+    model_->unsubscribe(MSG_BOARD_REDETECTION, &DetectionController::onBoardReDetection, this);
+
+    model_->unsubscribe(MSG_BOARD_REEVALUATION, &DetectionController::onBoardReEvaluation, this);
+
+    model_->unsubscribe(MSG_BOARD_STORED, &DetectionController::onBoardStored, this);
+
+    model_->unsubscribe(MSG_BOARD_UPDATE, &DetectionController::onBoardUpdate, this);
+
+    model_->unsubscribe(MSG_BOARD_SEQUENCE_REEVALUATED, &DetectionController::onBoardSequenceReEvaluated, this);
+
+    model_->unsubscribe(MSG_PATTERN_TYPE_CHANGED, &DetectionController::onPatternTypeChanged, this);
+
+    model_->shutdown();
+
+    uiTickProxy_->Stop();
+}
 
 std::vector<std::shared_ptr<Board>> DetectionController::getDetectedBoards() const
 {
@@ -130,6 +163,8 @@ void DetectionController::init(const std::shared_ptr<CameraManager>& cameraManag
 
     model_->subscribe(MSG_PATTERN_TYPE_CHANGED, &DetectionController::onPatternTypeChanged, this);
 
+    model_->subscribe(MSG_SESSION_CLEARED, &DetectionController::onSessionCleared, this);
+
     
     // View
     view_->Bind(GUI_LOAD_IMAGE, &DetectionController::OnLoadImage, this);
@@ -137,7 +172,6 @@ void DetectionController::init(const std::shared_ptr<CameraManager>& cameraManag
 
     view_->Bind(GUI_SNAP_CAMERA, &DetectionController::OnSnap, this);
     view_->Bind(GUI_LIVE_CAMERA, &DetectionController::OnLiveCamera, this);
-    view_->Bind(GUI_CHANGE_CAMERA, &DetectionController::OnChangeCamera, this);
 
     view_->Bind(GUI_DET_REMOVE_BOARD, &DetectionController::OnRemoveBoard, this);
     view_->Bind(GUI_DET_REMOVE_ALL_BOARDS, &DetectionController::OnRemoveAllBoards, this);
@@ -278,7 +312,7 @@ void DetectionController::OnUiTick()
         return;
     }
 
-    if (model_->isLiveOn())
+    if (model_->isLiveSession())
     {
         utils_->cook({ DetectionResultMap::Id(0), model_->getLatestLiveDetectionResult() });
     }
@@ -328,7 +362,8 @@ void DetectionController::OnUiTick()
             break;
         }
 
-        viewState_->SetCurrentRenderedBoard(boardRes->id());
+        if (!view_->IsBoardSelected())
+            viewState_->SetCurrentRenderedBoard(boardRes->id());
     }
 
     // Board sequence
@@ -488,7 +523,21 @@ void DetectionController::SelectBoard(const BoardEvent& event)
 {
     if (!view_->IsBoardSelected())
     {
-        view_->ClearImageDisplay();
+        bool shouldClearDisplay = true;
+
+        if (view_->IsShowDebPluginSelected())
+        {
+            const auto [_, pluginLocation] = view_->GetSelectedDebPlugin().value();
+
+            if (pluginLocation == EvaluationPanel::PluginLocation::PER_SEQUENCE)
+            {
+                shouldClearDisplay = false;
+            }
+        }
+
+        if (shouldClearDisplay)
+            view_->ClearImageDisplay();
+
         view_->ClearAllPlugins(EvaluationPanel::PluginLocation::PER_BOARD);
 
         viewState_->UnsetCurrentRenderedBoard();
@@ -632,9 +681,8 @@ void DetectionController::OnRemoveBoard(BoardEvent& event)
 }
 
 //
-void DetectionController::RemoveAllBoards()
+void DetectionController::ClearSessionView()
 {
-    model_->removeAllDetectionsResults();
     view_->RemoveAllBoards();
     view_->ClearAllPlugins(EvaluationPanel::PluginLocation::PER_BOARD);
     view_->ClearAllPlugins(EvaluationPanel::PluginLocation::PER_SEQUENCE);
@@ -673,6 +721,13 @@ void DetectionController::RemoveAllBoards()
     {
         view_->ClearImageDisplay();
     }
+}
+
+void DetectionController::RemoveAllBoards()
+{
+    model_->removeAllDetectionsResults();
+
+    ClearSessionView();
 }
 
 void DetectionController::OnRemoveAllBoards(wxCommandEvent& event)
@@ -722,7 +777,7 @@ void DetectionController::Snap()
     if (wxCameraID.IsEmpty()) return;
 
     // TODO: there is a difference between 'is live on' and 'is trying to live grab' !!!
-    if (model_->isLiveOn())
+    if (model_->isSessionOn() && model_->isLiveSession())
     {
         std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentLiveFrame();
         if (opt_boardResId.has_value())
@@ -753,6 +808,15 @@ void DetectionController::Snap()
         return;
     }
 
+    const DetectionModel::SessionType sessionType = model_->sessionType();
+
+    if (sessionType != DetectionModel::SessionType::UNDEFINED && sessionType != DetectionModel::SessionType::CAMERA)
+    {
+        if (!view_->AskYesNo("Starting a new session with a different type will clear all detection results.\nAre you sure?"))
+        {
+            return;
+        }
+    }
 
     view_->SetUiState(DetectionPage::UiState::BUSY);
 
@@ -774,6 +838,16 @@ void DetectionController::OnSnap(const wxCommandEvent& event)
 //
 void DetectionController::LoadImg()
 {
+    const DetectionModel::SessionType sessionType = model_->sessionType();
+
+    if (sessionType != DetectionModel::SessionType::UNDEFINED && sessionType != DetectionModel::SessionType::FILE)
+    {
+        if (!view_->AskYesNo("Starting a new session with a different type will clear all detection results.\nAre you sure?"))
+        {
+            return;
+        }
+    }
+
     wxFileDialog openFileDialog(nullptr, "Load Image", "", "",
         "Image files (*.ima;*.tif;*.tiff;*.gif;*.bmp;*.jpg;*.jpeg;*.jp2;*.jxr;*.png;*.pcx;*.ras;*.xwd;*.pbm;*.pnm;*.pgm;*.ppm)|*.ima;*.tif;*.tiff;*.gif;*.bmp;*.jpg;*.jpeg;*.jp2;*.jxr;*.png;*.pcx;*.ras;*.xwd;*.pbm;*.pnm;*.pgm;*.ppm",
         wxFD_OPEN | wxFD_FILE_MUST_EXIST | wxFD_MULTIPLE);
@@ -819,6 +893,19 @@ void DetectionController::LiveCamera()
     {
         view_->SetUiState(DetectionPage::UiState::START_LIVE);
 
+        const DetectionModel::SessionType sessionType = model_->sessionType();
+        
+        if (sessionType != DetectionModel::SessionType::UNDEFINED && sessionType != DetectionModel::SessionType::CAMERA)
+        {
+            if (!view_->AskYesNo("Starting a new session with a different type will clear all detection results.\nAre you sure?"))
+            {
+                view_->SetUiState(DetectionPage::UiState::IDLE);
+
+                return;
+            }
+        }
+
+
         res = model_->startCameraSession(wxCameraID.ToStdString());
 
         if (res.getStatus() == TaskEnqueueResult::Status::REJECTED)
@@ -828,7 +915,7 @@ void DetectionController::LiveCamera()
     {
         view_->SetUiState(DetectionPage::UiState::STOP_LIVE);
 
-        res = model_->stopLiveSession();
+        res = model_->stopSession();
 
         if (res.getStatus() == TaskEnqueueResult::Status::ALREADY_DONE)
             view_->SetUiState(DetectionPage::UiState::IDLE);
@@ -843,105 +930,57 @@ void DetectionController::OnLiveCamera(const wxCommandEvent& event)
 }
 
 //
-void DetectionController::ChangeCamera(const wxString& cameraId)
-{
-    view_->ClearImageDisplay();
-    view_->RemoveAllBoards();
-    view_->ClearAllPlugins(EvaluationPanel::PluginLocation::PER_BOARD);
-    view_->ClearAllPlugins(EvaluationPanel::PluginLocation::PER_SEQUENCE);
-    view_->UnselectBoard();
-    viewState_->UnsetCurrentRenderedBoard();
-}
-
-void DetectionController::OnChangeCamera(const wxCommandEvent& event)
-{
-    ChangeCamera(event.GetString());
-}
-
-//
 void DetectionController::ShowPerBoardDebugResult(const wxCommandEvent& event)
 {
-    bool isLiveFrame = true;
-
-    // Live frame has priority over rendered board, if any
-    std::optional<DetectionResult::Id> resId = viewState_->GetCurrentLiveFrame();
-    if (!resId.has_value())
-    {
-        isLiveFrame = false;
-        resId = viewState_->GetCurrentRenderedBoard();
-    }
+    std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentRenderedBoard();
 
     // We do not want to display deb result if no board is rendered
-    if (!resId.has_value())
+    if (!opt_boardResId.has_value())
     {
         view_->ClearImageDisplay();
         return;
     }
 
-    const DetectionResult::Id boardResId = resId.value();
+    const DetectionResult::Id boardResId = opt_boardResId.value();
     const std::string pluginId = event.GetString().ToStdString();
     const bool isChecked = static_cast<bool>(event.GetInt());
 
     // Convert and display board deb result
     if (isChecked)
     {
-        std::shared_ptr<DetectionResult> boardRes;
-        if (isLiveFrame)
+        std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+            model_->getLiveDetectionResult(boardResId).value_or(nullptr)
+        );
+
+        if (boardRes)
         {
-            std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(boardResId);
-            if (!opt_boardRes.has_value())
+            // Convert debug result
+            std::optional<PluginDebugResultView> convRes = utils_->buildPluginDebugResult(pluginId, boardRes->evaluatedBoard());
+            if (convRes.has_value())    // plugin deb converted, render it
             {
-                UpdateLogs(Log("Live frame with id " + wxString::Format("%" PRIu64, boardResId.getValue()) + " is no more"));
-
-                return;
+                view_->UpdateImageDisplay(convRes.value().debugImage());
             }
-
-            boardRes = opt_boardRes.value();
-        }
-        else
-        {
-            // Only the Controller can remove boards from the Model, so if we have a board id here,
-            // it means the board is still in the Model, hence we can directly get it without checking its existence
-            boardRes = model_->getDetectionResult(boardResId).value();
-        }
-
-        // Convert debug result
-        std::optional<PluginDebugResultView> convRes = utils_->buildPluginDebugResult(pluginId, boardRes->evaluatedBoard());
-        if (convRes.has_value())    // plugin deb converted, render it
-        {
-            view_->UpdateImageDisplay(convRes.value().debugImage());
-        }
-        else  // utilsLayer has no builder for said plugin...
-        {
-            // ...fallback to displaying its board image
-            view_->UpdateImageDisplay(
-                utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
-            );
+            else  // utilsLayer has no builder for said plugin...
+            {
+                // ...fallback to displaying its board image
+                view_->UpdateImageDisplay(
+                    utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+                );
+            }
         }
     }
     else
     {
-        std::shared_ptr<DetectionResult> boardRes;
-        if (isLiveFrame)
-        {
-            std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(boardResId);
-            if (!opt_boardRes.has_value())
-            {
-                UpdateLogs(Log("Live frame with id " + wxString::Format("%" PRIu64, boardResId.getValue()) + " is no more"));
-
-                return;
-            }
-
-            boardRes = opt_boardRes.value();
-        }
-        else
-        {
-            boardRes = model_->getDetectionResult(boardResId).value();
-        }
-
-        view_->UpdateImageDisplay(
-            utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+        std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+            model_->getLiveDetectionResult(boardResId).value_or(nullptr)
         );
+
+        if (boardRes)
+        {
+            view_->UpdateImageDisplay(
+                utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+            );
+        }
     }
 }
 
@@ -956,15 +995,7 @@ void DetectionController::ShowPerSequenceDebugResult(const wxCommandEvent& event
     const std::string pluginId = event.GetString().ToStdString();
     const bool isChecked = static_cast<bool>(event.GetInt());
 
-    bool isLiveFrame = true;
-
-    // Live frame has priority over rendered board, if any
-    std::optional<DetectionResult::Id> resId = viewState_->GetCurrentLiveFrame();
-    if (!resId.has_value())
-    {
-        isLiveFrame = false;
-        resId = viewState_->GetCurrentRenderedBoard();
-    }
+    std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentRenderedBoard();
 
     // Convert and display board sequence deb result
     if (isChecked)
@@ -980,67 +1011,49 @@ void DetectionController::ShowPerSequenceDebugResult(const wxCommandEvent& event
         }
         else  // utilsLayer has no builder for said plugin...
         {
-            // No board to display if no live frame nor rendered board
-            if (!resId.has_value())
+            // No board to display if no rendered board
+            if (!opt_boardResId.has_value())
             {
                 view_->ClearImageDisplay();
             }
             else // ...fallback to displaying rendered board image
             {
-                std::shared_ptr<DetectionResult> boardRes;
-                if (isLiveFrame)
-                {
-                    std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(resId.value());
-                    if (!opt_boardRes.has_value())
-                    {
-                        UpdateLogs(Log("Board id " + wxString::Format("%" PRIu64, resId.value().getValue()) + " is no more"));
+                DetectionResult::Id boardResId = opt_boardResId.value();
 
-                        return;
-                    }
-
-                    boardRes = opt_boardRes.value();
-                }
-                else
-                {
-                    boardRes = model_->getDetectionResult(resId.value()).value();
-                }
-
-                view_->UpdateImageDisplay(
-                    utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+                std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+                    model_->getLiveDetectionResult(boardResId).value_or(nullptr)
                 );
+
+                if (boardRes)
+                {
+                    view_->UpdateImageDisplay(
+                        utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+                    );
+                }
             }
         }
     }
     else
     {
-        // No board to display if no live frame nor rendered board
-        if (!resId.has_value())
+        // No board to display if no rendered board
+        if (!opt_boardResId.has_value())
         {
             view_->ClearImageDisplay();
         }
         else // ...fallback to displaying rendered board image
         {
-            std::shared_ptr<DetectionResult> boardRes;
-            if (isLiveFrame)
-            {
-                std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(resId.value());
-                if (!opt_boardRes.has_value())
-                {
-                    UpdateLogs(Log("Board id " + wxString::Format("%" PRIu64, resId.value().getValue()) + " is no more"));
+            DetectionResult::Id boardResId = opt_boardResId.value();
 
-                    return;
-                }
-
-                boardRes = opt_boardRes.value();
-            }
-            else
-            {
-                boardRes = model_->getDetectionResult(resId.value()).value();
-            }
-
-            view_->UpdateImageDisplay(
-                utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+            std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+                model_->getLiveDetectionResult(boardResId).value_or(nullptr)
             );
+
+            if (boardRes)
+            {
+                view_->UpdateImageDisplay(
+                    utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+                );
+            }
         }
     }
 }
@@ -1062,32 +1075,23 @@ void DetectionController::ShowPixelTooltip(const PixelEvent& event)
     std::optional<wxString> tip;
     if (pluginLocation == EvaluationPanel::PluginLocation::PER_BOARD)
     {
-        std::optional<DetectionResult::Id> resId = viewState_->GetCurrentRenderedBoard();
-        if (resId.has_value())
+        std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentRenderedBoard();
+        if (opt_boardResId.has_value())
         {
-            std::shared_ptr<DetectionResult> boardRes;
-            if (model_->isLiveOn())
-            {
-                std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(resId.value());
-                if (!opt_boardRes.has_value())
-                {
-                    UpdateLogs(Log("Board id " + wxString::Format("%" PRIu64, resId.value().getValue()) + " is no more"));
+            DetectionResult::Id boardResId = opt_boardResId.value();
 
-                    return;
-                }
-
-                boardRes = opt_boardRes.value();
-            }
-            else
-            {
-                boardRes = model_->getDetectionResult(resId.value()).value();
-            }
-
-            tip = utils_->getPluginPixelTooltip(
-                pluginId.ToStdString(),
-                boardRes->evaluatedBoard(),
-                pixel
+            std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+                model_->getLiveDetectionResult(boardResId).value_or(nullptr)
             );
+
+            if (boardRes)
+            {
+                tip = utils_->getPluginPixelTooltip(
+                    pluginId.ToStdString(),
+                    boardRes->evaluatedBoard(),
+                    pixel
+                );
+            }
         }
     }
     else if (pluginLocation == EvaluationPanel::PluginLocation::PER_SEQUENCE)
@@ -1126,39 +1130,23 @@ void DetectionController::DrawBoard(const wxCommandEvent& event)
     if (view_->IsShowDebPluginSelected())
         return;
 
-    bool isLiveFrame = true;
+    std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentRenderedBoard();
 
-    // Live frame has priority over rendered board, if any
-    std::optional<DetectionResult::Id> resId = viewState_->GetCurrentLiveFrame();
-    if (!resId.has_value())
-    {
-        isLiveFrame = false;
-        resId = viewState_->GetCurrentRenderedBoard();
-    }
-    if (!resId.has_value())
+    if (!opt_boardResId.has_value())
         return;
 
-    std::shared_ptr<DetectionResult> boardRes;
-    if (isLiveFrame)
-    {
-        std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(resId.value());
-        if (!opt_boardRes.has_value())
-        {
-            UpdateLogs(Log("Board id " + wxString::Format("%" PRIu64, resId.value().getValue()) + " is no more"));
+    DetectionResult::Id boardResId = opt_boardResId.value();
 
-            return;
-        }
-
-        boardRes = opt_boardRes.value();
-    }
-    else
-    {
-        boardRes = model_->getDetectionResult(resId.value()).value();
-    }
-
-    view_->UpdateImageDisplay(
-        utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+    std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+        model_->getLiveDetectionResult(boardResId).value_or(nullptr)
     );
+
+    if (boardRes)
+    {
+        view_->UpdateImageDisplay(
+            utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+        );
+    }
 }
 
 void DetectionController::DrawMarks(const wxCommandEvent& event)
@@ -1173,39 +1161,23 @@ void DetectionController::DrawMarks(const wxCommandEvent& event)
     if (view_->IsShowDebPluginSelected())
         return;
 
-    bool isLiveFrame = true;
+    std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentRenderedBoard();
 
-    // Live frame has priority over rendered board, if any
-    std::optional<DetectionResult::Id> resId = viewState_->GetCurrentLiveFrame();
-    if (!resId.has_value())
-    {
-        isLiveFrame = false;
-        resId = viewState_->GetCurrentRenderedBoard();
-    }
-    if (!resId.has_value())
+    if (!opt_boardResId.has_value())
         return;
 
-    std::shared_ptr<DetectionResult> boardRes;
-    if (isLiveFrame)
-    {
-        std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(resId.value());
-        if (!opt_boardRes.has_value())
-        {
-            UpdateLogs(Log("Board id " + wxString::Format("%" PRIu64, resId.value().getValue()) + " is no more"));
+    DetectionResult::Id boardResId = opt_boardResId.value();
 
-            return;
-        }
-
-        boardRes = opt_boardRes.value();
-    }
-    else
-    {
-        boardRes = model_->getDetectionResult(resId.value()).value();
-    }
-
-    view_->UpdateImageDisplay(
-        utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+    std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+        model_->getLiveDetectionResult(boardResId).value_or(nullptr)
     );
+
+    if (boardRes)
+    {
+        view_->UpdateImageDisplay(
+            utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+        );
+    }
 }
 
 void DetectionController::DrawWCS(const wxCommandEvent& event)
@@ -1220,56 +1192,163 @@ void DetectionController::DrawWCS(const wxCommandEvent& event)
     if (view_->IsShowDebPluginSelected())
         return;
 
-    bool isLiveFrame = true;
+    std::optional<DetectionResult::Id> opt_boardResId = viewState_->GetCurrentRenderedBoard();
 
-    // Live frame has priority over rendered board, if any
-    std::optional<DetectionResult::Id> resId = viewState_->GetCurrentLiveFrame();
-    if (!resId.has_value())
-    {
-        isLiveFrame = false;
-        resId = viewState_->GetCurrentRenderedBoard();
-    }
-    if (!resId.has_value())
+    if (!opt_boardResId.has_value())
         return;
 
-    std::shared_ptr<DetectionResult> boardRes;
-    if (isLiveFrame)
-    {
-        std::optional<std::shared_ptr<DetectionResult>> opt_boardRes = model_->getLiveDetectionResult(resId.value());
-        if (!opt_boardRes.has_value())
-        {
-            UpdateLogs(Log("Board id " + wxString::Format("%" PRIu64, resId.value().getValue()) + " is no more"));
+    DetectionResult::Id boardResId = opt_boardResId.value();
 
-            return;
-        }
-
-        boardRes = opt_boardRes.value();
-    }
-    else
-    {
-        boardRes = model_->getDetectionResult(resId.value()).value();
-    }
-
-    view_->UpdateImageDisplay(
-        utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+    std::shared_ptr<DetectionResult> boardRes = model_->getDetectionResult(boardResId).value_or(
+        model_->getLiveDetectionResult(boardResId).value_or(nullptr)
     );
+
+    if (boardRes)
+    {
+        view_->UpdateImageDisplay(
+            utils_->convertBoardImageToWx(boardRes->evaluatedBoard()->object())
+        );
+    }
 }
 
 //
 void DetectionController::ReloadParameters()
 {
-    // Setup
-    {
-        const std::vector<std::shared_ptr<ParameterInfo>> params = model_->getDetectionParametersInfo();
+    const BoardPattern pattern = UtilityFunctions::enumFromInt<BoardPattern>(
+        model_->getParameter("pattern_type", PatternParametersRegistry::CATEGORY())->getValue<int>()
+    ).value();
 
-        view_->SetParameters(std::move(params), DetectionView::ParameterLocation::Setup);
+    // Setup pattern
+    {
+        const std::vector<std::shared_ptr<ParameterInfo>> params = model_->getFilteredParams(PatternParametersRegistry::CATEGORY());
+
+        view_->SetParameters(params, DetectionView::ParameterLocation::SetupPattern);
 
         for (const auto& p : params)
         {
             const std::string& pName = p->name();
             const std::string& pCat = p->category();
 
-            view_->MarkParameterAsDirty(pName, model_->isParameterDirty(pName, pCat));
+            view_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
+        }
+    }
+
+    // Setup geometry
+    {
+        std::vector<std::shared_ptr<ParameterInfo>> params;
+
+        switch (pattern)
+        {
+            case BoardPattern::CHESSBOARD:
+                 params = model_->getFilteredParams(ChessboardParametersRegistry::CATEGORY_GEOMETRY);
+
+                break;
+
+            case BoardPattern::SYMMETRIC_CIRCLES:
+            case BoardPattern::ASYMMETRIC_CIRCLES:
+                params = model_->getFilteredParams(CircleboardParametersRegistry::CATEGORY_GEOMETRY);
+
+                break;
+
+            case BoardPattern::CHARUCO:
+                params = model_->getFilteredParams(ArucoParametersRegistry::CATEGORY_GEOMETRY());
+                UtilityFunctions::moveInto(model_->getFilteredParams(CharucoParametersRegistry::CATEGORY_GEOMETRY), params);
+
+                break;
+
+            case BoardPattern::APRIL_TAG:
+                params = model_->getFilteredParams(ArucoParametersRegistry::CATEGORY_GEOMETRY());
+                UtilityFunctions::moveInto(model_->getFilteredParams(AprilTagParametersRegistry::CATEGORY_GEOMETRY), params);
+
+                break;
+        }
+
+        view_->SetParameters(params, DetectionView::ParameterLocation::SetupGeometry);
+
+        for (const auto& p : params)
+        {
+            const std::string& pName = p->name();
+            const std::string& pCat = p->category();
+
+            view_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
+        }
+    }
+
+    // Setup detection
+    {
+        std::vector<std::shared_ptr<ParameterInfo>> params;
+
+        switch (pattern)
+        {
+            case BoardPattern::CHESSBOARD:
+                params = model_->getFilteredParams(ChessboardParametersRegistry::CATEGORY_DETECTION);
+
+                break;
+
+            case BoardPattern::SYMMETRIC_CIRCLES:
+            case BoardPattern::ASYMMETRIC_CIRCLES:
+                params = model_->getFilteredParams(ChessboardParametersRegistry::CATEGORY_DETECTION);
+
+                break;
+
+            case BoardPattern::CHARUCO:
+                params = model_->getFilteredParams(ArucoParametersRegistry::CATEGORY_DETECTION());
+                UtilityFunctions::moveInto(model_->getFilteredParams(CharucoParametersRegistry::CATEGORY_DETECTION), params);
+
+                break;
+
+            case BoardPattern::APRIL_TAG:
+                params = model_->getFilteredParams(ArucoParametersRegistry::CATEGORY_DETECTION());
+                UtilityFunctions::moveInto(model_->getFilteredParams(AprilTagParametersRegistry::CATEGORY_DETECTION), params);
+
+                break;
+        }
+
+        view_->SetParameters(std::move(params), DetectionView::ParameterLocation::SetupDetection);
+
+        for (const auto& p : params)
+        {
+            const std::string& pName = p->name();
+            const std::string& pCat = p->category();
+
+            view_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
+        }
+    }
+
+    // Setup refine
+    {
+        std::vector<std::shared_ptr<ParameterInfo>> params;
+
+        switch (pattern)
+        {
+            case BoardPattern::CHESSBOARD:
+                params = model_->getFilteredParams(ChessboardParametersRegistry::CATEGORY_REFINE);
+
+                break;
+
+            case BoardPattern::SYMMETRIC_CIRCLES:
+            case BoardPattern::ASYMMETRIC_CIRCLES:
+                break;
+
+            case BoardPattern::CHARUCO:
+                params = model_->getFilteredParams(ArucoParametersRegistry::CATEGORY_REFINE());
+
+                break;
+
+            case BoardPattern::APRIL_TAG:
+                params = model_->getFilteredParams(ArucoParametersRegistry::CATEGORY_REFINE());
+
+                break;
+        }
+
+        view_->SetParameters(std::move(params), DetectionView::ParameterLocation::SetupRefine);
+
+        for (const auto& p : params)
+        {
+            const std::string& pName = p->name();
+            const std::string& pCat = p->category();
+
+            view_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
         }
     }
 
@@ -1284,7 +1363,7 @@ void DetectionController::ReloadParameters()
             const std::string& pName = p->name();
             const std::string& pCat = p->category();
 
-            view_->MarkParameterAsDirty(pName, model_->isParameterDirty(pName, pCat));
+            view_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
         }
     }
 }
@@ -1558,10 +1637,17 @@ void DetectionController::onBoardSequenceReEvaluated(const MessageP<std::shared_
 void DetectionController::onPatternTypeChanged(const Message& message)
 {
     wxTheApp->CallAfter([this, message]() {
-        view_->SetParameters(
-            model_->getDetectionParametersInfo(),
-            DetectionView::ParameterLocation::Setup
-        );
+        ReloadParameters();
+
+        UpdateLogsMessage(message);
+        });
+}
+
+//
+void DetectionController::onSessionCleared(const Message& message)
+{
+    wxTheApp->CallAfter([this, message]() {
+        ClearSessionView();
 
         UpdateLogsMessage(message);
         });

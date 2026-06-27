@@ -8,6 +8,7 @@ MaxErrorCheck::MaxErrorCheck(double threshold)
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        {},
         threshold)
 {
 }
@@ -26,7 +27,9 @@ std::shared_ptr<MaxErrorCheck> MaxErrorCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> MaxErrorCheck::executeImpl(const CalibratedBoard& calibratedBoard) const
+std::shared_ptr<PluginResult> MaxErrorCheck::executeImpl(
+    const CalibratedBoard& calibratedBoard,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     const double maxError = calibratedBoard.maxError();
 

@@ -51,10 +51,12 @@ public:
     /**
      * @brief Toggles a visual indicator to show if a parameter has unsaved changes.
      * @param paramId The unique string identifier of the parameter.
+     * @param categoryId The unique string identifier of the parameter category.
      * @param isDirty Set to true if the parameter has been modified, false to clear the flag.
      */
     void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     );
 

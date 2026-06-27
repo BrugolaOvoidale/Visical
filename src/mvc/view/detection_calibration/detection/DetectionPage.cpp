@@ -10,6 +10,7 @@
 #include <gui_elements/image_panel/ImagePanel.hpp>
 #include <gui_elements/parameter/ParameterWidgetList.hpp>
 #include <gui_elements/parameter/ParameterWidget.hpp>
+#include <gui_elements/persistent_tooltip/PersistentToolTip.hpp>
 #include <parameter/ParameterInfo.hpp>
 #include "image_preprocess/ImagePreprocess.hpp"
 #include "DetectionPageEvents.hpp"
@@ -42,8 +43,6 @@ DetectionPage::DetectionPage(
     SetSizer(mainSizer);
     
     SetUiState(UiState::IDLE);
-
-    UpdateCameraFeedBtns();
 
     m_imagePreprocessFrame = new ImagePreprocess(this, "Pre processing");
 }
@@ -87,12 +86,19 @@ void DetectionPage::RemoveCamera(const wxString& cameraId)
         m_devicesList->Delete(index);
 	}
 
+    if (IsCameraSelected())
+        PersistentToolTip::SetToolTip(m_devicesList, GetSelectedCamera());
+    else
+        PersistentToolTip::RemoveToolTip(m_devicesList);
+
     UpdateCameraFeedBtns();
 }
 
 void DetectionPage::RemoveAllCameras()
 {
     m_devicesList->Clear();
+
+    PersistentToolTip::RemoveToolTip(m_devicesList);
 
     UpdateCameraFeedBtns();
 }
@@ -103,15 +109,30 @@ void DetectionPage::SetParameters(
 {
     switch (where)
     {
-    case ParameterLocation::Setup:
-        m_detParamsList->SetParameters(params);
+        case ParameterLocation::SetupPattern:
+            m_patternParamsList->SetParameters(params);
 
-        break;
+            break;
 
-    case ParameterLocation::PreProcessing:
-        m_imagePreprocessFrame->SetParameters(params, ParameterLocation::PreProcessing);
+        case ParameterLocation::SetupGeometry:
+            m_geomParamsList->SetParameters(params);
 
-        break;
+            break;
+
+        case ParameterLocation::SetupDetection:
+            m_detParamsList->SetParameters(params);
+
+            break;
+
+        case ParameterLocation::SetupRefine:
+            m_refineParamsList->SetParameters(params);
+
+            break;
+
+        case ParameterLocation::PreProcessing:
+            m_imagePreprocessFrame->SetParameters(params, ParameterLocation::PreProcessing);
+
+            break;
     }
 }
 
@@ -119,26 +140,48 @@ void DetectionPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& param)
 {
     m_imagePreprocessFrame->UpdateParameter(param);
 
-    std::shared_ptr<ParameterWidget> widget = m_detParamsList->GetWidget(param->name());
+    const std::string& paramId = param->name();
+    const std::string& categoryId = param->category();
 
+    std::shared_ptr<ParameterWidget> widget = m_patternParamsList->GetWidget(paramId, categoryId);
     if (widget)
-    {
         widget->Update(param);
-    }
+
+    widget = m_geomParamsList->GetWidget(paramId, categoryId);
+    if (widget)
+        widget->Update(param);
+
+    widget = m_detParamsList->GetWidget(paramId, categoryId);
+    if (widget)
+        widget->Update(param);
+
+    widget = m_refineParamsList->GetWidget(paramId, categoryId);
+    if (widget)
+        widget->Update(param);
 }
 
 void DetectionPage::MarkParameterAsDirty(
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
-    m_imagePreprocessFrame->MarkParameterAsDirty(paramId, isDirty);
+    m_imagePreprocessFrame->MarkParameterAsDirty(paramId, categoryId, isDirty);
 
-    std::shared_ptr<ParameterWidget> widget = m_detParamsList->GetWidget(paramId);
-
+    std::shared_ptr<ParameterWidget> widget = m_patternParamsList->GetWidget(paramId, categoryId);
     if (widget)
-    {
         widget->MarkAsDirty(isDirty);
-    }
+
+    widget = m_geomParamsList->GetWidget(paramId, categoryId);
+    if (widget)
+        widget->MarkAsDirty(isDirty);
+
+    widget = m_detParamsList->GetWidget(paramId, categoryId);
+    if (widget)
+        widget->MarkAsDirty(isDirty);
+
+    widget = m_refineParamsList->GetWidget(paramId, categoryId);
+    if (widget)
+        widget->MarkAsDirty(isDirty);
 }
 
 void DetectionPage::SetUiState(UiState uiState)
@@ -218,6 +261,13 @@ void DetectionPage::SetImageSource(ImageSource src)
 DetectionPage::ImageSource DetectionPage::GetImageSource() const
 {
     return m_imgSrc;
+}
+
+void DetectionPage::SelectBoard(std::uint32_t id)
+{
+    CalibrationStageView::SelectBoard(id);
+
+    UpdateRemoveBoardBtn();
 }
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -309,15 +359,47 @@ wxPanel* DetectionPage::CreateSetupDetectionTab(wxWindow* parent)
     vbox->Add(modelParamsSizer, 0);
     
 
+    // Geometry parameters
+    wxStaticBoxSizer* patternParamsBox = new wxStaticBoxSizer(wxVERTICAL, panel, "Pattern");
+
+    m_patternParamsList = new ParameterWidgetList(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
+
+    m_patternParamsList->SetMinSize(FromDIP(wxSize(280, 100)));
+
+    patternParamsBox->Add(m_patternParamsList, 1, wxEXPAND | wxALL, 0);
+
+    // Geometry parameters
+    wxStaticBoxSizer* geomParamsBox = new wxStaticBoxSizer(wxVERTICAL, panel, "Geometry");
+
+    m_geomParamsList = new ParameterWidgetList(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
+
+    m_geomParamsList->SetMinSize(FromDIP(wxSize(280, 100)));
+
+    geomParamsBox->Add(m_geomParamsList, 1, wxEXPAND | wxALL, 0);
+
     // Detection parameters
-    wxStaticBoxSizer* detParamsBox = new wxStaticBoxSizer(wxVERTICAL, panel, "Detection parameters");
+    wxStaticBoxSizer* detParamsBox = new wxStaticBoxSizer(wxVERTICAL, panel, "Detection");
 
     m_detParamsList = new ParameterWidgetList(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
 
     detParamsBox->Add(m_detParamsList, 1, wxEXPAND | wxALL, 0);
 
+    m_detParamsList->SetMinSize(FromDIP(wxSize(280, 100)));
+
+    // Refine parameters
+    wxStaticBoxSizer* refineParamsBox = new wxStaticBoxSizer(wxVERTICAL, panel, "Refine");
+
+    m_refineParamsList = new ParameterWidgetList(panel, wxID_ANY, wxDefaultPosition, wxDefaultSize, wxBORDER_SIMPLE);
+
+    m_refineParamsList->SetMinSize(FromDIP(wxSize(280, 100)));
+
+    refineParamsBox->Add(m_refineParamsList, 1, wxEXPAND | wxALL, 0);
+
     // Add fileBox to the main layout
+    vbox->Add(patternParamsBox, 1, wxEXPAND | wxALL, 0);
+    vbox->Add(geomParamsBox, 1, wxEXPAND | wxALL, 0);
     vbox->Add(detParamsBox, 1, wxEXPAND | wxALL, 0);
+    vbox->Add(refineParamsBox, 1, wxEXPAND | wxALL, 0);
 
     // Set the sizer to the panel
     panel->SetSizer(vbox);
@@ -368,6 +450,7 @@ wxPanel* DetectionPage::CreateImageDisplayPanel(wxWindow* parent)
     m_deviceLabel = new wxStaticText(panel, wxID_ANY, "Camera:");
     m_devicesList = new wxChoice(panel, wxID_ANY);
     m_devicesList->Bind(wxEVT_CHOICE, &DetectionPage::OnChangeCamera, this);
+    m_devicesList->SetMaxSize(FromDIP(wxSize(400, -1)));
 
     deviceSizer->Add(m_deviceLabel, 0, wxALIGN_CENTER_VERTICAL);
     deviceSizer->Add(m_devicesList, 1, wxALIGN_CENTER_VERTICAL | wxLEFT, 5);
@@ -377,7 +460,7 @@ wxPanel* DetectionPage::CreateImageDisplayPanel(wxWindow* parent)
     // Image panel
     m_imagePanel = new ImagePanel(panel);
     m_imagePanel->SetBackgroundColour(*wxWHITE);
-    m_imagePanel->SetMinSize(wxSize(400, 400));
+    m_imagePanel->SetMinSize(FromDIP(wxSize(400, 400)));
     m_imagePanel->SetDisplayMode(ImagePanel::FIT_ASPECT_RATIO);
 
     imagePanelBox->Add(m_imagePanel, 1, wxEXPAND | wxALL, 5);
@@ -868,15 +951,12 @@ void DetectionPage::OnRemoveAllBoards(wxCommandEvent& event)
 
 void DetectionPage::OnChangeCamera(wxCommandEvent& event)
 {
+    if (IsCameraSelected())
+        PersistentToolTip::SetToolTip(m_devicesList, GetSelectedCamera());
+    else
+        PersistentToolTip::RemoveToolTip(m_devicesList);
+
     UpdateCameraFeedBtns();
-
-    // Let the parent know this board was clicked
-    wxCommandEvent evt(GUI_CHANGE_CAMERA, GetId());
-
-    evt.SetString(m_devicesList->GetStringSelection());
-
-    // Send it to parent
-    ProcessEvent(evt);         // sends to this and upwards
 }
 
 void DetectionPage::OnImageSourceToFile(wxCommandEvent& event)

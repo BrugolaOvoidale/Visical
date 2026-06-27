@@ -74,11 +74,13 @@ public:
      * @brief Marks a specific configuration parameter inside a plugin as modified ("dirty").
      * @param pluginId Unique identifier of the plugin.
      * @param paramId Unique identifier of the parameter.
+     * @param categoryId Unique identifier of the parameter category.
      * @param isDirty Flag state to assign.
      */
     void MarkPluginParameterAsDirty(
         const wxString& pluginId,
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     );
 

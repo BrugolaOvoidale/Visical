@@ -1,4 +1,4 @@
-﻿#include "BoardWidget.hpp"
+#include "BoardWidget.hpp"
 #include <inttypes.h>
 #include <wx/panel.h>
 #include <wx/sizer.h>
@@ -105,7 +105,7 @@ wxPanel* BoardWidget::CreateHeader()
         wxID_ANY,
         wxEmptyString,
         wxDefaultPosition,
-        wxSize(100, -1), // Width limits it
+        wxSize(200, -1), // Width limits it
         wxST_ELLIPSIZE_MIDDLE // Ellipsize at the midlle
     );
     BindSelectable(m_noteItem);
@@ -149,7 +149,11 @@ void BoardWidget::SetDescriptionImpl()
 void BoardWidget::DoSetNote()
 {
     m_noteItem->SetLabel(m_note);
-    PersistentToolTip(m_noteItem, m_note);
+
+    if (m_note.IsEmpty())
+        PersistentToolTip::RemoveToolTip(m_noteItem);
+    else
+        PersistentToolTip::SetToolTip(m_noteItem, m_note);
 }
 
 void BoardWidget::DoSetStatus()

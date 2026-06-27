@@ -24,9 +24,9 @@ std::optional<wxString> BaseView::OpenFileDialog(
         m_self,         // Parent window
         message,        // Dialog title
         defaultPath,    // Default directory (empty = current dir)
-        "",             // Default filename
+        wxEmptyString,  // Default filename
         wildCard,       // File wildcard filter
-        wxFD_OPEN           // wxFD_SAVE | wxFD_OVERWRITE_PROMPT, etc.
+        wxFD_OPEN       // wxFD_SAVE | wxFD_OVERWRITE_PROMPT, etc.
     );
 
     if (openFileDialog.ShowModal() == wxID_OK)
@@ -45,11 +45,11 @@ std::optional<wxString> BaseView::SaveFileDialog(
 {
     // Always include wxFD_SAVE and wxFD_OVERWRITE_PROMPT
     wxFileDialog saveFileDialog(
-        m_self,         // Parent window
-        message,        // Dialog title
-        defaultPath,    // Default directory (empty = current dir)
-        defaultFileName,             // Default filename
-        wildCard,       // File wildcard filter
+        m_self,             // Parent window
+        message,            // Dialog title
+        defaultPath,        // Default directory (empty = current dir)
+        defaultFileName,    // Default filename
+        wildCard,           // File wildcard filter
         wxFD_SAVE | wxFD_OVERWRITE_PROMPT
     );
 

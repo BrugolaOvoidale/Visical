@@ -15,20 +15,20 @@ IlluminationCheckRegistry::IlluminationCheckRegistry()
 
 void IlluminationCheckRegistry::registerAllParameters()
 {
-	// Mark dilation radius
+	// Kernel size
 	{
 		std::shared_ptr<Parameter> aParam = ParameterDouble::create(
-			"mark_dilation_radius",
+			"kernel_size",
 			CATEGORY,
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			IlluminationCheck::Defaults::markDilationRadius,
+			IlluminationCheck::Defaults::kernelSize,
 			1.0,
 			20.0,
 			0.1,
-			"Mark dilation radius",
+			"Kernel size",
 			"px",
-			"Sets the radius (in pixels) used to dilate calibration mark regions before computing illumination metrics. A larger radius analyzes a broader neighborhood around each mark, making the measurement less sensitive to local noise but more influenced by global lighting gradients. Smaller values focus strictly on the mark regions and are useful when background areas are unreliable. Increase this value when lighting varies smoothly across the board; decrease it if nearby artifacts or reflections disturb the measurement."
+			"Sets the kernel size (in pixels) used to dilate or erode calibration mark regions before computing illumination metrics. For circlegrid-like patterns, this value represents the radius of the circular dilation kernel. For chessboard-like patterns, it represents the side length of the rectangular erosion kernel. A larger radius analyzes a broader neighborhood around each mark, making the measurement less sensitive to local noise but more influenced by global lighting gradients. Smaller values focus strictly on the mark regions and are useful when background areas are unreliable. Increase this value when lighting varies smoothly across the board; decrease it if nearby artifacts or reflections disturb the measurement."
 		);
 
 		registerParameter(

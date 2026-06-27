@@ -26,10 +26,12 @@ public:
      * @brief Constructor.
      * @param target The window that triggers this tooltip.
      * @param text The initial string to display.
+     * @param isManual If true, show and hide must be manually managed.
      */
     PersistentToolTip(
         wxWindow* target,
-        const wxString& text
+        const wxString& text,
+        bool isManual = false
     );
 
     ~PersistentToolTip();
@@ -64,6 +66,9 @@ public:
     /** @brief Sets the maximum width of the tooltip window (useful for wrapping text). */
     void SetMaxWidth(int width);
 
+    /** @brief Set the target for this tooltip. If nullptr, show and hide must be manually managed. */
+    void SetManual(bool isManual);
+
     /** @brief Gets the current maximum width. Returns -1 if no limit is set. */
     int GetMaxWidth() const;
 
@@ -76,6 +81,9 @@ public:
      * @param text The text to display.
      */
     void ShowAt(const wxPoint& screenPos, const wxString& text);
+
+    /** @brief Dismiss tooltip now.*/
+    void DismissNow();
 
 private:
     void BuildUI();
@@ -90,11 +98,9 @@ private:
 
     void ApplyMaxWidth();
 
-    void ShowTooltip();
+    void ShowTooltip(const wxPoint& screenPos);
 
-    void ShowNow();
-
-    void DismissNow();
+    void ShowNow(const wxPoint& screenPos);
 
 
     //-----------------------------------------------------------------------------
@@ -133,6 +139,8 @@ private:
     // Delay before showing.
     int m_delayMs;
 
+    wxPoint m_delayedPos;
+
     // Time until auto-hide.
     int m_autoPopMs;
 
@@ -142,6 +150,8 @@ private:
     bool m_enabled;
 
     bool m_wasVisible;
+
+    bool m_isManual;
 
     wxTimer m_delayTimer;
 

@@ -41,7 +41,7 @@ void EvaluationPluginParametersFrame::SetParameters(const std::vector<std::share
 
 void EvaluationPluginParametersFrame::UpdateParameter(const std::shared_ptr<ParameterInfo>& param)
 {
-    std::shared_ptr<ParameterWidget> widget = m_pluginParamsList->GetWidget(param->name());
+    std::shared_ptr<ParameterWidget> widget = m_pluginParamsList->GetWidget(param->name(), param->category());
 
     if (widget)
     {
@@ -51,9 +51,10 @@ void EvaluationPluginParametersFrame::UpdateParameter(const std::shared_ptr<Para
 
 void EvaluationPluginParametersFrame::MarkParameterAsDirty(
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
-    std::shared_ptr<ParameterWidget> widget = m_pluginParamsList->GetWidget(paramId);
+    std::shared_ptr<ParameterWidget> widget = m_pluginParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {

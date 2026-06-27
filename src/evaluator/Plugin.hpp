@@ -41,6 +41,7 @@ protected:
         const std::string& id,
         const std::string& name,
         const std::string& description,
+        const std::vector<std::string>& dependencies = {},
         double threshold = IPlugin::DEFAULT_THRESHOLD
     );
 
@@ -68,13 +69,6 @@ protected:
         double quality,
         const std::shared_ptr<PluginDebugResult>& debugResult
     ) const;
-
-    /**
-     * @brief Creates a result indicating that the plugin logic could not be performed.
-     * @param message Description of why the plugin was not applicable to the current input.
-     * @return A shared pointer to a PluginResult with a 'Not Applicable' status.
-     */
-    std::shared_ptr<PluginResult> executionNotApplicable(const std::string& message) const;
 
     /**
      * @brief Pure virtual method to be implemented by subclasses to provide context-aware messages.

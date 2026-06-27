@@ -7,6 +7,7 @@ BoardSizeCheck::BoardSizeCheck(double threshold)
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        {},
         threshold)
 {
 }
@@ -29,7 +30,9 @@ std::shared_ptr<BoardSizeCheck> BoardSizeCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> BoardSizeCheck::executeImpl(const std::shared_ptr<Board>& board) const
+std::shared_ptr<PluginResult> BoardSizeCheck::executeImpl(
+    const std::shared_ptr<Board>& board,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     if (!board->isDetected())
         return executionFailed("Cannot evaluate a non-detected board");

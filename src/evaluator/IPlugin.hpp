@@ -1,5 +1,6 @@
 #pragma once
 #include <memory>
+#include <vector>
 #include "PluginInfo.hpp"
 
 
@@ -38,6 +39,9 @@ public:
     /** @brief Returns a description of what this plugin does. */
     const std::string& description() const;
 
+    /** @brief  */
+    const std::vector<std::string>& dependencies() const;
+
     /** @brief Returns the current score threshold. */
     double getThreshold() const;
 
@@ -62,6 +66,7 @@ protected:
         const std::string& id,
         const std::string& name,
         const std::string& description,
+        const std::vector<std::string>& dependencies = {},
         double threshold = DEFAULT_THRESHOLD
     );
 
@@ -74,6 +79,9 @@ private:
 
     // Plugin description
     std::string description_;
+
+    // Plugin dependencies
+    std::vector<std::string> dependencies_;
     
     // Score threshold value
     double threshold_;

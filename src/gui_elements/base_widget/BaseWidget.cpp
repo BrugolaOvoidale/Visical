@@ -1,4 +1,4 @@
-﻿#include "BaseWidget.hpp"
+#include "BaseWidget.hpp"
 #include <wx/panel.h>
 #include <wx/button.h>
 #include <wx/statline.h>
@@ -57,7 +57,9 @@ void BaseWidget::Initialize(bool startShowed)
 
     if (m_hasMetadataPanel)
     {
-        m_toggleBtn = new wxButton(m_widgetPanel, wxID_ANY, EXPAND, wxDefaultPosition, wxSize(18, 18));
+        m_toggleBtn = new wxButton(m_widgetPanel, wxID_ANY, EXPAND, wxDefaultPosition, wxDefaultSize, wxBU_EXACTFIT);
+        m_toggleBtn->SetMinSize(m_widgetPanel->FromDIP(wxSize(18, 18)));
+
         wxStaticLine* sep = new wxStaticLine(m_widgetPanel, wxID_ANY, wxDefaultPosition, wxSize(1, 20), wxLI_VERTICAL);
 
         m_headerSizer->Add(m_toggleBtn, 0, wxALIGN_CENTER_VERTICAL);
@@ -403,18 +405,25 @@ void BaseWidget::DoUpdateMetadata(const wxString& key)
     auto widgetIt = m_currMetadataWidgets.find(key);
     if (widgetIt == m_currMetadataWidgets.end())
     {
-        auto* staticText = new wxStaticText(m_metadataPanel, wxID_ANY, label);
+        wxStaticText* staticText = new wxStaticText(m_metadataPanel, wxID_ANY, label);
 
         m_metaSizer->Add(staticText, 0, wxBOTTOM, 2);
 
+        PersistentToolTip::SetToolTip(staticText, label);
+        
         BindSelectable(staticText);
 
         m_currMetadataWidgets[key] = staticText;
     }
     else
     {
-        widgetIt->second->SetLabel(label);
+        wxStaticText* staticText = widgetIt->second;
+
+        staticText->SetLabel(label);
+    
+        PersistentToolTip::SetToolTip(staticText, label);
     }
+
 }
 
 void BaseWidget::DoUpdateMetadataBulk()
@@ -426,9 +435,12 @@ void BaseWidget::DoUpdateMetadataBulk()
     {
         if (m_currMetadata.find(it->first) == m_currMetadata.end())
         {
-            UnbindSelectable(it->second);
-            m_metaSizer->Detach(it->second);
-            it->second->Destroy();
+            wxStaticText* staticText = it->second;
+
+            PersistentToolTip::RemoveToolTip(staticText);
+            UnbindSelectable(staticText);
+            m_metaSizer->Detach(staticText);
+            staticText->Destroy();
             it = m_currMetadataWidgets.erase(it);
             layoutDirty = true;
         }
@@ -446,8 +458,10 @@ void BaseWidget::DoUpdateMetadataBulk()
         auto it = m_currMetadataWidgets.find(key);
         if (it == m_currMetadataWidgets.end())
         {
-            auto* staticText = new wxStaticText(m_metadataPanel, wxID_ANY, newLabel);
+            wxStaticText* staticText = new wxStaticText(m_metadataPanel, wxID_ANY, newLabel);
             m_metaSizer->Add(staticText, 0, wxBOTTOM, 2);
+
+            PersistentToolTip::SetToolTip(staticText, newLabel);
             BindSelectable(staticText);
 
             m_currMetadataWidgets[key] = staticText;
@@ -455,9 +469,15 @@ void BaseWidget::DoUpdateMetadataBulk()
         }
         else if (it->second->GetLabel() != newLabel)
         {
-            it->second->SetLabel(newLabel);
+            wxStaticText* staticText = it->second;
+
+            staticText->SetLabel(newLabel);
+
+            PersistentToolTip::SetToolTip(staticText, newLabel);
+
             layoutDirty = true;
         }
+
     }
 
     if (layoutDirty)

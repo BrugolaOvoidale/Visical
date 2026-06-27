@@ -132,9 +132,10 @@ void EvaluationPluginWidget::UpdatePluginResult(const std::shared_ptr<PluginResu
 
 void EvaluationPluginWidget::MarkParameterAsDirty(
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
-    m_pluginParametersFrame->MarkParameterAsDirty(paramId, isDirty);
+    m_pluginParametersFrame->MarkParameterAsDirty(paramId, categoryId, isDirty);
 }
 
 void EvaluationPluginWidget::SetActive(bool isActive)

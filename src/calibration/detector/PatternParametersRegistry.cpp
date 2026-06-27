@@ -1,18 +1,18 @@
-#include "PatternParamsRegistry.hpp"
+#include "PatternParametersRegistry.hpp"
 #include <UtilityFunctions.hpp>
 #include <parameter/enum/ParameterEnum.hpp>
 #include <parameter/numeric/ParameterNumeric.hpp>
-#include "PatternParams.hpp"
+#include "PatternParameters.hpp"
 
 
-const std::string& PatternParamsRegistry::CATEGORY()
+const std::string& PatternParametersRegistry::CATEGORY()
 {
 	static const std::string category{ "board_detection" };
 
 	return category;
 }
 
-PatternParamsRegistry::PatternParamsRegistry()
+PatternParametersRegistry::PatternParametersRegistry()
 	: ParameterRegistry()
 {
 	registerAllParameters();
@@ -20,7 +20,7 @@ PatternParamsRegistry::PatternParamsRegistry()
 
 /////////////////////////////////////////////////////////////
 
-void PatternParamsRegistry::registerAllParameters()
+void PatternParametersRegistry::registerAllParameters()
 {
 	// Board pattern
 	{
@@ -48,7 +48,7 @@ void PatternParamsRegistry::registerAllParameters()
 			CATEGORY(),
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			8,
+			7,
 			1,
 			std::nullopt,
 			std::nullopt,
@@ -69,7 +69,7 @@ void PatternParamsRegistry::registerAllParameters()
 			CATEGORY(),
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			5,
+			7,
 			1,
 			std::nullopt,
 			std::nullopt,

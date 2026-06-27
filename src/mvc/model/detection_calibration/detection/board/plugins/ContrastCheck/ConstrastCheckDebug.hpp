@@ -61,6 +61,7 @@ public:
 	 */
 	ConstrastCheckDebug(
 		std::vector<std::vector<CvContour>> dilatedMarks,
+		double contrast,
 		std::vector<Mark> marks
 	);
 
@@ -74,12 +75,18 @@ public:
 	/** @brief Returns the contours used for visual debugging of the dilated areas. */
 	const std::vector<std::vector<CvContour>>& dilatedMarks() const;
 
+	/** @brief Returns the calculated board average contrast. */
+	double contrast() const;
+
 	/** @brief Returns the list of scores and severities for each mark. */
 	const std::vector<Mark>& marks() const;
 
 private:
 	// Geometry for debug visualization.
 	std::vector<std::vector<CvContour>> dilatedMarks_;
+
+	// Board average contrast
+	double contrast_;
 
 	// Data points for contrast analysis.
 	std::vector<Mark> marks_;

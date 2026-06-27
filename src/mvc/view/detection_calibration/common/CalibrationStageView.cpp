@@ -241,9 +241,10 @@ bool CalibrationStageView::SetSelectedDebPlugin(
 void CalibrationStageView::MarkPluginParameterAsDirty(
     const wxString& pluginId,
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
-    m_evaluationPanel->MarkPluginParameterAsDirty(pluginId, paramId, isDirty);
+    m_evaluationPanel->MarkPluginParameterAsDirty(pluginId, paramId, categoryId, isDirty);
 }
 
 std::optional<std::pair<wxString, EvaluationPanel::PluginLocation>> CalibrationStageView::GetSelectedDebPlugin() const

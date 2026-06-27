@@ -168,10 +168,30 @@ public:
     CvRegion dilationCircle(double radius) const;
 
     /**
+     * @brief Performs a morphological dilation using a rectangular kernel.
+     * @param width The width of the rectangular structuring element.
+     * @param height The height of the rectangular structuring element.
+     */
+    CvRegion dilationRectangle(
+        double width,
+        double height
+    ) const;
+
+    /**
+     * @brief Performs a morphological erosion using a rectangular kernel.
+     * @param width The width of the rectangular structuring element.
+     * @param height The height of the rectangular structuring element.
+     */
+    CvRegion erosionRectangle(
+        double width,
+        double height
+    ) const;
+
+    /**
      * @brief Extracts contours from the binary mask.
      * @param mode The interpretation mode for boundaries.
      */
-    std::vector<CvContour> toContours(ContourMode mode = ContourMode::BORDER);
+    std::vector<CvContour> toContours(ContourMode mode = ContourMode::BORDER) const;
 
     /** @brief Returns a list of all pixel coordinates that are part of the region. */
     const std::vector<cv::Point>& points() const;

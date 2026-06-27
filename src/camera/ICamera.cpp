@@ -130,6 +130,7 @@ TaskEnqueueResult ICamera::startGrab(int timeout)
 
         if (msg.abortIf(!setAcqModeRes.isSuccess(), std::move(exitLogs)))
         {
+            isStartingGrab_.store(false);
             return false;
         }
 
@@ -144,6 +145,7 @@ TaskEnqueueResult ICamera::startGrab(int timeout)
 
         if (msg.abortIf(!startRes.isSuccess(), std::move(exitLogs)))
         {
+            isStartingGrab_.store(false);
             return false;
         }
 
@@ -157,6 +159,7 @@ TaskEnqueueResult ICamera::startGrab(int timeout)
 
         if (!result.isSuccess())
         {
+            isStartingGrab_.store(false);
 
             TaskResult stopResult = stopFrameCapture();
             UtilityFunctions::moveInto(stopResult.takeLogs(), exitLogs);
@@ -927,7 +930,7 @@ void ICamera::finalizeGrabLoop()
         UtilityFunctions::moveInto(stopGrabResult.takeLogs(), exitLogs);
     }
 
-    msg.complete(exitLogs);
+    msg.complete(std::move(exitLogs));
 }
 
 TaskResult ICamera::stopGrabSync()

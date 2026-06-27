@@ -75,7 +75,7 @@ public:
     /**
      * @brief Gracefully stops and clear the internal resources.
      */
-    void shutdown();
+    void shutdown() override;
 
     /** 
      * @brief Asynchronously triggers a scan for all supported camera interfaces..

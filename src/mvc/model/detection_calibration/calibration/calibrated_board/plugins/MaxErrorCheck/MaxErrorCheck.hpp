@@ -50,7 +50,10 @@ private:
     // Private constructor to ensure instantiation via factory methods.
     MaxErrorCheck(double threshold);
 
-    std::shared_ptr<PluginResult> executeImpl(const CalibratedBoard& calibratedBoard) const override;
+    std::shared_ptr<PluginResult> executeImpl(
+        const CalibratedBoard& calibratedBoard,
+        const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults = {}
+    ) const override;
 
     void validateParameters() const override;
 

@@ -410,8 +410,7 @@ PluginDebugResultView DetectionUtility::buildContrastCheckResult(
             if (markColour.has_value())
             {
                 // disjoint regions
-                painter_
-                    ->setColour(markColour.value())
+                CvPainter(markColour.value())
                     .drawPoints(
                         debugImg,
                         CvRegion::fromContours(dilatedMarks[i], true).points()
@@ -464,8 +463,7 @@ PluginDebugResultView DetectionUtility::buildFocusCheckResult(
             if (markColour.has_value())
             {
                 // disjoint regions
-                painter_
-                    ->setColour(markColour.value())
+                CvPainter(markColour.value())
                     .drawPoints(
                         debugImg,
                         CvRegion::fromContours({ marksRegion[i] }, false).points()
@@ -520,8 +518,7 @@ PluginDebugResultView DetectionUtility::buildIlluminationCheckResult(
             if (markColour.has_value())
             {
                 // disjoint regions
-                painter_
-                    ->setColour(markColour.value())
+                CvPainter(markColour.value())
                     .drawPoints(
                         debugImg,
                         CvRegion::fromContours(dilatedMarks[i], true).points()
@@ -620,7 +617,7 @@ std::optional<wxString> DetectionUtility::getContrastCheckPixelTooltip(
                 tip = wxString::Format(
                     "(X ; Y) %d, %d\n"
                     "--- Mark #%zu ---\n"
-                    "Score: %.2f\n"
+                    "Score: %.2f%%\n"
                     "Range: %.2f\n",
                     p.x, p.y,
                     i,
@@ -686,7 +683,7 @@ std::optional<wxString> DetectionUtility::getFocusCheckPixelTooltip(
                 tip = wxString::Format(
                     "(X ; Y) %d, %d\n"
                     "--- Mark #%zu ---\n"
-                    "Score: %.2f\n"
+                    "Score: %.2f%%\n"
                     "Mean Gradient: %.2f\n"
                     "Normalized Gradient: %.2f\n"
                     "--- Global ---\n"
@@ -751,7 +748,7 @@ std::optional<wxString> DetectionUtility::getIlluminationCheckPixelTooltip(
                 tip = wxString::Format(
                     "(X ; Y) %d, %d\n"
                     "--- Mark #%zu ---\n"
-                    "Score: %.2f\n"
+                    "Score: %.2f%%\n"
                     "Max Gray Value: %.2f\n"
                     "Deviation: %.2f\n"
                     "--- Global ---\n"

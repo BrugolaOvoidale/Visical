@@ -1,25 +1,44 @@
 #include "Detector.hpp"
 #include <opencv2/calib3d.hpp>
+#include <opencv2/objdetect/charuco_detector.hpp>
 #include <cv/CvImage.hpp>
-#include "ChessboardParams.hpp"
-#include "CircleboardParams.hpp"
+#include "ChessboardParameters.hpp"
+#include "CircleboardParameters.hpp"
+#include "CharucoParameters.hpp"
+#include "AprilTagParameters.hpp"
 #include "../CameraIntrinsics.hpp"
 #include "../Board.hpp"
 
 
 Detector::Detector(
     CameraIntrinsics camIntrinsics,
-    ChessboardParams detParams)
+    ChessboardParameters detParams)
 	: camIntrinsics_(std::move(camIntrinsics)),
-    detectionParams_(std::make_shared<ChessboardParams>(std::move(detParams)))
+    detectionParams_(std::make_shared<ChessboardParameters>(std::move(detParams)))
 {
 }
 
 Detector::Detector(
     CameraIntrinsics camIntrinsics,
-    CircleboardParams detParams)
+    CircleboardParameters detParams)
 	: camIntrinsics_(std::move(camIntrinsics)),
-    detectionParams_(std::make_shared<CircleboardParams>(std::move(detParams)))
+    detectionParams_(std::make_shared<CircleboardParameters>(std::move(detParams)))
+{
+}
+
+Detector::Detector(
+    CameraIntrinsics camIntrinsics,
+    CharucoParameters detParams)
+	: camIntrinsics_(std::move(camIntrinsics)),
+    detectionParams_(std::make_shared<CharucoParameters>(std::move(detParams)))
+{
+}
+
+Detector::Detector(
+    CameraIntrinsics camIntrinsics,
+    AprilTagParameters detParams)
+	: camIntrinsics_(std::move(camIntrinsics)),
+    detectionParams_(std::make_shared<AprilTagParameters>(std::move(detParams)))
 {
 }
 
@@ -30,24 +49,50 @@ void Detector::setCameraIntrinsics(CameraIntrinsics camIntrinsics)
     camIntrinsics_ = std::move(camIntrinsics);
 }
 
-void Detector::setDetectionParameters(ChessboardParams detParams)
+void Detector::setDetectionParameters(ChessboardParameters detParams)
 {
-    detectionParams_ = std::make_shared<ChessboardParams>(std::move(detParams));
+    detectionParams_ = std::make_shared<ChessboardParameters>(std::move(detParams));
 }
 
-void Detector::setDetectionParameters(CircleboardParams detParams)
+void Detector::setDetectionParameters(CircleboardParameters detParams)
 {
-    detectionParams_ = std::make_shared<CircleboardParams>(std::move(detParams));
+    detectionParams_ = std::make_shared<CircleboardParameters>(std::move(detParams));
+}
+
+void Detector::setDetectionParameters(CharucoParameters detParams)
+{
+    detectionParams_ = std::make_shared<CharucoParameters>(std::move(detParams));
+}
+
+void Detector::setDetectionParameters(AprilTagParameters detParams)
+{
+    detectionParams_ = std::make_shared<AprilTagParameters>(std::move(detParams));
 }
 
 std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
 {
+    const BoardPattern patternType = detectionParams_->patternType();
+
+    if (patternType == BoardPattern::CHESSBOARD || patternType == BoardPattern::SYMMETRIC_CIRCLES || patternType == BoardPattern::ASYMMETRIC_CIRCLES)
+        return findCommonTypesBoard(iconicImage);
+
+    if (patternType == BoardPattern::CHARUCO || patternType == BoardPattern::APRIL_TAG)
+        return findArucoBasedBoard(iconicImage);
+
+    throw std::runtime_error("Board pattern not supported");
+}
+
+//////////////////////////////////////////////////////////////
+
+std::shared_ptr<Board> Detector::findCommonTypesBoard(const CvImage& iconicImage)
+{
     cv::Mat mat = iconicImage.toGray().mat();
 
+    const BoardPattern patternType = detectionParams_->patternType();
     Detector::FindBoardResult findResult;
 
     // Detect calibration pattern
-    switch (detectionParams_->patternType())
+    switch (patternType)
     {
         case BoardPattern::CHESSBOARD:
             findResult = findChessboard(mat);
@@ -60,9 +105,7 @@ std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
 
             break;
 
-        case BoardPattern::CHARUCO:
-            // Charuco detection would require aruco module
-            findResult.found = false;
+        default:
             break;
     }
 
@@ -71,14 +114,27 @@ std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
         return std::make_shared<Board>(
             Board::notDetected(
                 iconicImage,
-                detectionParams_->patternType(),
-                detectionParams_->patternSize()
+                patternType,
+                detectionParams_->getGeometry().patternSize()
             )
         );
     }
 
 
-    std::vector<cv::Point3f> objectPoints = generateObjectPoints();
+    std::vector<cv::Point3f> objectPoints;
+
+    switch (detectionParams_->patternType())
+    {
+        case BoardPattern::CHESSBOARD:
+            objectPoints = generateChessboardObjectPoints();
+
+        case BoardPattern::SYMMETRIC_CIRCLES:
+        case BoardPattern::ASYMMETRIC_CIRCLES:
+            objectPoints = generateCirclesObjectPoints();
+
+        default:
+            break;
+    }
 
     CvContour boardContour = generateBoardContour(findResult.corners, objectPoints);
 
@@ -109,17 +165,17 @@ std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
         return std::make_shared<Board>(
             Board::poseNotSolved(
                 iconicImage,
-			    detectionParams_->patternType(),
-			    detectionParams_->patternSize(),
+                patternType,
+                detectionParams_->getGeometry().patternSize(),
                 std::move(boardContour),
-			    std::move(findResult.corners),
+                std::move(findResult.corners),
                 std::move(objectPoints)
             )
         );
     }
 
     std::vector<CvContour> marksContours;
-    switch (detectionParams_->patternType())
+    switch (patternType)
     {
         case BoardPattern::CHESSBOARD:
             marksContours = generateChessboardMarksContour(findResult.corners);
@@ -130,8 +186,7 @@ std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
             marksContours = generateCirclesMarksContour(findResult.corners, objectPoints, rvec, tvec);
             break;
 
-        case BoardPattern::CHARUCO:
-            // TODO: Implement
+        default:
             break;
     }
 
@@ -141,7 +196,7 @@ std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
         Board(
             iconicImage,
             detectionParams_->patternType(),
-            detectionParams_->patternSize(),
+            detectionParams_->getGeometry().patternSize(),
             std::move(boardContour),
             std::move(marksContours),
             std::move(findResult.corners),
@@ -153,48 +208,170 @@ std::shared_ptr<Board> Detector::findBoard(const CvImage& iconicImage)
     );
 }
 
-//////////////////////////////////////////////////////////////
-
-Detector::FindBoardResult Detector::findChessboard(const cv::Mat& input) const
+std::shared_ptr<Board> Detector::findArucoBasedBoard(const CvImage& iconicImage)
 {
-    if (!detectionParams_)
+    cv::Mat mat = iconicImage.toGray().mat();
+    const BoardPattern patternType = detectionParams_->patternType();
+
+    cv::Size patternSize;
+    cv::aruco::Board* arucoBoard{ nullptr };
+
+    FindArucoResult findResult;
+
+    switch (patternType)
     {
-        throw std::runtime_error("Detection parameters not set");
-	}
-    else if (detectionParams_->patternType() != BoardPattern::CHESSBOARD)
-    {
-        throw std::runtime_error("Detection parameters type mismatch: expected CHESSBOARD");
-	}
+        case BoardPattern::CHARUCO:
+        {
+            findResult = findCharucoBoard(mat);
 
-    auto p = std::static_pointer_cast<ChessboardParams>(detectionParams_);
+            auto p = std::static_pointer_cast<CharucoParameters>(detectionParams_);
 
+            patternSize = p->geometry.patternSize();
+            arucoBoard = &p->geometry.charuco;
 
-    Detector::FindBoardResult result;
-
-
-    int flags = 0;
-
-    if (p->adaptiveThreshold) flags |= cv::CALIB_CB_ADAPTIVE_THRESH;
-    if (p->normalizeImage)    flags |= cv::CALIB_CB_NORMALIZE_IMAGE;
-    if (p->filterQuads)       flags |= cv::CALIB_CB_FILTER_QUADS;
-    if (p->subpixelAccuracy)  flags |= cv::CALIB_CB_ACCURACY;
-    if (p->allowLargerBoards) flags |= cv::CALIB_CB_LARGER;
-
-    switch (p->searchAccuracy)
-    {
-        case ChessboardParams::SearchAccuracy::FAST:
-            flags |= cv::CALIB_CB_FAST_CHECK;
             break;
-        case ChessboardParams::SearchAccuracy::EXHAUSTIVE:
-            flags |= cv::CALIB_CB_EXHAUSTIVE;
+        }
+
+        case BoardPattern::APRIL_TAG:
+        {
+            findResult = findAprilTagBoard(mat);
+
+            auto p = std::static_pointer_cast<AprilTagParameters>(detectionParams_);
+
+            patternSize = p->geometry.patternSize();
+            arucoBoard = &p->geometry.aprilTag;
+
             break;
-        case ChessboardParams::SearchAccuracy::BALANCED:
+        }
+
+        default:
             break;
     }
 
+    if (!findResult.found)
+    {
+        return std::make_shared<Board>(Board::notDetected(
+            iconicImage,
+            patternType,
+            patternSize
+        ));
+    }
+
+    std::vector<cv::Point3f> objectPoints;
+    std::vector<cv::Point2f> imgPoints;
+
+    switch (patternType)
+    {
+    case BoardPattern::CHARUCO:
+        arucoBoard->matchImagePoints(
+            findResult.corners,
+            findResult.arucoIds,
+            objectPoints,
+            imgPoints
+        );
+
+        break;
+
+    case BoardPattern::APRIL_TAG:
+        arucoBoard->matchImagePoints(
+            findResult.markerCorners,
+            findResult.markerIds,
+            objectPoints,
+            imgPoints
+        );
+
+        break;
+
+    default:
+        break;
+    }
+   
+    if (imgPoints.size() < 4)
+    {
+        return std::make_shared<Board>(Board::notDetected(
+            iconicImage,
+            patternType,
+            patternSize
+        ));
+    }
+
+    CvContour boardContour = generateBoardContour(imgPoints, objectPoints);
+
+    // Solve PnP to get pose (rotation and translation vectors)
+    cv::Mat rvec, tvec;
+
+    bool pnpSuccess = cv::solvePnP(
+            objectPoints,
+            imgPoints,
+            camIntrinsics_.cameraMatrix(),
+            camIntrinsics_.distortionModel().coeffs(),
+            rvec,
+            tvec,
+            false,
+            cv::SOLVEPNP_ITERATIVE
+        );
+
+    if (!pnpSuccess)
+    {
+        return std::make_shared<Board>(Board::poseNotSolved(
+            iconicImage,
+            patternType,
+            patternSize,
+            std::move(boardContour),
+            std::move(imgPoints),
+            std::move(objectPoints)
+        ));
+    }
+
+    // Marks contours: project the four corners of each detected ArUco marker square.
+    std::vector<CvContour> marksContours = generateQuadMarksContour(findResult.markerCorners);
+
+
+    std::vector<cv::Point2f> axes2D = generateAxes2D(objectPoints, rvec, tvec);
+
+    return std::make_shared<Board>(Board(
+        iconicImage,
+        patternType,
+        patternSize,
+        std::move(boardContour),
+        std::move(marksContours),
+        std::move(imgPoints),
+        std::move(objectPoints),
+        std::move(rvec),
+        std::move(tvec),
+        std::move(axes2D)
+    ));
+}
+
+Detector::FindBoardResult Detector::findChessboard(const cv::Mat& input) const
+{
+    auto p = std::static_pointer_cast<ChessboardParameters>(detectionParams_);
+
+    int flags = 0;
+
+    if (p->detection.adaptiveThreshold) flags |= cv::CALIB_CB_ADAPTIVE_THRESH;
+    if (p->detection.normalizeImage)    flags |= cv::CALIB_CB_NORMALIZE_IMAGE;
+    if (p->detection.filterQuads)       flags |= cv::CALIB_CB_FILTER_QUADS;
+    if (p->detection.subpixelAccuracy)  flags |= cv::CALIB_CB_ACCURACY;
+    if (p->detection.allowLargerBoards) flags |= cv::CALIB_CB_LARGER;
+
+    switch (p->detection.searchAccuracy)
+    {
+    case ChessboardParameters::Detection::SearchAccuracy::FAST:
+            flags |= cv::CALIB_CB_FAST_CHECK;
+            break;
+        case ChessboardParameters::Detection::SearchAccuracy::EXHAUSTIVE:
+            flags |= cv::CALIB_CB_EXHAUSTIVE;
+            break;
+        case ChessboardParameters::Detection::SearchAccuracy::BALANCED:
+            break;
+    }
+
+    Detector::FindBoardResult result;
+
     result.found = cv::findChessboardCorners(
         input,
-        p->patternSize(),
+        p->getGeometry().patternSize(),
         result.corners,
         flags
     );
@@ -202,16 +379,36 @@ Detector::FindBoardResult Detector::findChessboard(const cv::Mat& input) const
     // Refine corner positions with sub-pixel accuarcy
     if (result.found)
     {
+        int termCriteria = 0;
+
+        switch (p->refine.type)
+        {
+        case ChessboardParameters::Refine::TermCriteriaType::COUNT:
+            termCriteria = cv::TermCriteria::Type::COUNT;
+
+            break;
+
+        case ChessboardParameters::Refine::TermCriteriaType::EPSILON:
+            termCriteria = cv::TermCriteria::Type::EPS;
+
+            break;
+
+        case ChessboardParameters::Refine::TermCriteriaType::BOTH:
+            termCriteria = cv::TermCriteria::Type::COUNT + cv::TermCriteria::Type::EPS;
+
+            break;
+        }
+
         cv::TermCriteria criteria(
-            cv::TermCriteria::EPS + cv::TermCriteria::MAX_ITER,
-            30,
-            0.001
+            termCriteria,
+            p->refine.maxCount,
+            p->refine.epsilon
         );
         cv::cornerSubPix(
             input,
             result.corners,
-            cv::Size(11, 11),
-            cv::Size(-1, -1),
+            p->refine.winSize,
+            p->refine.zeroZone,
             criteria
         );
     }
@@ -221,33 +418,19 @@ Detector::FindBoardResult Detector::findChessboard(const cv::Mat& input) const
 
 Detector::FindBoardResult Detector::findCircleboard(const cv::Mat& input) const
 {
-    if (!detectionParams_)
-    {
-        throw std::runtime_error("Detection parameters not set");
-	}
-
-    const BoardPattern& boardPattern = detectionParams_->patternType();
-
-    if (boardPattern != BoardPattern::SYMMETRIC_CIRCLES && boardPattern != BoardPattern::ASYMMETRIC_CIRCLES)
-    {
-        throw std::runtime_error("Detection parameters type mismatch: expected SYMMETRIC_CIRCLES or ASYMMETRIC_CIRCLES");
-	}
-
-    auto p = std::static_pointer_cast<CircleboardParams>(detectionParams_);
-
-
-    Detector::FindBoardResult result;
-
+    auto p = std::static_pointer_cast<CircleboardParameters>(detectionParams_);
 
     int flags = 0;
 
-    if (boardPattern == BoardPattern::SYMMETRIC_CIRCLES)    flags |= cv::CALIB_CB_SYMMETRIC_GRID;
+    if (detectionParams_->patternType() == BoardPattern::SYMMETRIC_CIRCLES)    flags |= cv::CALIB_CB_SYMMETRIC_GRID;
     else                                                    flags |= cv::CALIB_CB_ASYMMETRIC_GRID;
-    if (p->useClustering)                                   flags |= cv::CALIB_CB_CLUSTERING;
+    if (p->detection.useClustering)                         flags |= cv::CALIB_CB_CLUSTERING;
+
+    Detector::FindBoardResult result;
 
     result.found = cv::findCirclesGrid(
         input,
-        p->patternSize(),
+        p->getGeometry().patternSize(),
         result.corners,
         flags
     );
@@ -255,47 +438,92 @@ Detector::FindBoardResult Detector::findCircleboard(const cv::Mat& input) const
 	return result;
 }
 
-std::vector<cv::Point3f> Detector::generateObjectPoints() const
+Detector::FindArucoResult Detector::findCharucoBoard(const cv::Mat& input) const
 {
-    if (!detectionParams_)
+    auto p = std::static_pointer_cast<CharucoParameters>(detectionParams_);
+
+    Detector::FindArucoResult result;
+
+    cv::aruco::CharucoDetector charucoDetector(
+        p->geometry.charuco,
+        p->detection.charuco,
+        p->detection.arucoDetector,
+        p->refine.arucoRefine
+    );
+
+    charucoDetector.detectBoard(
+        input,
+        result.corners,
+        result.arucoIds,
+        result.markerCorners,
+        result.markerIds
+    );
+
+    result.found = !result.corners.empty();
+
+    return result;
+}
+
+Detector::FindArucoResult Detector::findAprilTagBoard(const cv::Mat& input) const
+{
+    auto p = std::static_pointer_cast<AprilTagParameters>(detectionParams_);
+
+    Detector::FindArucoResult result;
+
+    cv::aruco::ArucoDetector aprilTagDetector(
+        cv::aruco::getPredefinedDictionary(p->geometry.dictionary()),
+        p->detection.arucoDetector,
+        p->refine.arucoRefine
+    );
+
+    std::vector<std::vector<cv::Point2f>> rejectedCorners;
+
+    aprilTagDetector.detectMarkers(
+        input,
+        result.markerCorners,
+        result.markerIds,
+        rejectedCorners
+    );
+
+    result.found = !result.markerCorners.empty();
+
+    if (result.found)
     {
-        throw std::runtime_error("Detection parameters not set");
+        aprilTagDetector.refineDetectedMarkers(
+            input,
+            p->geometry.aprilTag,
+            result.markerCorners,
+            result.markerIds,
+            rejectedCorners
+        );
     }
 
-    switch (detectionParams_->patternType())
+    for (const auto& quad : result.markerCorners)
     {
-        case BoardPattern::CHESSBOARD:
-            return generateChessboardObjectPoints();
+        for (const auto& pt : quad)
+        {
+            result.corners.push_back(pt);
+        }
+    }
 
-        case BoardPattern::SYMMETRIC_CIRCLES:
-        case BoardPattern::ASYMMETRIC_CIRCLES:
-            return generateCirclesObjectPoints();
-
-        case BoardPattern::CHARUCO:
-        default:
-            return std::vector<cv::Point3f>();
-	}
+    return result;
 }
 
 std::vector<cv::Point3f> Detector::generateChessboardObjectPoints() const
 {
-    if (!detectionParams_)
-    {
-        throw std::runtime_error("Detection parameters not set");
-    }
-    else if (detectionParams_->patternType() != BoardPattern::CHESSBOARD)
+    if (detectionParams_->patternType() != BoardPattern::CHESSBOARD)
     {
         throw std::runtime_error("Detection parameters type mismatch: expected CHESSBOARD");
     }
 
-    auto p = std::static_pointer_cast<ChessboardParams>(detectionParams_);
+    auto p = std::static_pointer_cast<ChessboardParameters>(detectionParams_);
 
     std::vector<cv::Point3f> objectPoints;
 
     // Use actual physical dimensions from board description
     // squareSize should be in the same units (typically mm)
-    const float spacing = p->squareSize();
-	const cv::Size& patternSize = p->patternSize();
+    const float spacing = p->geometry.squareSize;
+	const cv::Size& patternSize = p->getGeometry().patternSize();
 
     for (int i = 0; i < patternSize.height; ++i)
     {
@@ -310,11 +538,6 @@ std::vector<cv::Point3f> Detector::generateChessboardObjectPoints() const
 
 std::vector<cv::Point3f> Detector::generateCirclesObjectPoints() const
 {
-    if (!detectionParams_)
-    {
-        throw std::runtime_error("Detection parameters not set");
-    }
-
     const BoardPattern& boardPattern = detectionParams_->patternType();
 
     if (boardPattern != BoardPattern::SYMMETRIC_CIRCLES && boardPattern != BoardPattern::ASYMMETRIC_CIRCLES)
@@ -322,14 +545,14 @@ std::vector<cv::Point3f> Detector::generateCirclesObjectPoints() const
         throw std::runtime_error("Detection parameters type mismatch: expected SYMMETRIC_CIRCLES or ASYMMETRIC_CIRCLES");
     }
 
-    auto p = std::static_pointer_cast<CircleboardParams>(detectionParams_);
+    auto p = std::static_pointer_cast<CircleboardParameters>(detectionParams_);
 
     std::vector<cv::Point3f> objectPoints;
 
     // Use actual physical dimensions from board description
     // centerDistance should be in the same units (typically mm)
-    const float spacing = p->centerDistance();
-	const cv::Size& patternSize = p->patternSize();
+    const float spacing = p->geometry.centerDistance;
+	const cv::Size& patternSize = p->getGeometry().patternSize();
 
     if (boardPattern == BoardPattern::SYMMETRIC_CIRCLES)
     {
@@ -357,23 +580,51 @@ std::vector<cv::Point3f> Detector::generateCirclesObjectPoints() const
     return objectPoints;
 }
 
+std::vector<cv::Point3f> Detector::generateAprilTagObjectPoints(
+    const std::vector<int>& tagIds,
+    const std::shared_ptr<AprilTagParameters>& p) const
+{
+    const std::vector<std::vector<cv::Point3f>>& allObjPoints = p->geometry.aprilTag.getObjPoints();
+    // allObjPoints[i] holds the 4 corners of the i-th marker in board space,
+    // indexed by marker index.
+
+    std::vector<cv::Point3f> objectPoints;
+    objectPoints.reserve(tagIds.size() * 4);
+    for (int id : tagIds)
+    {
+        if (id >= 0 && id < static_cast<int>(allObjPoints.size()))
+        {
+            for (const auto& pt : allObjPoints[id])
+                objectPoints.push_back(pt);
+        }
+    }
+
+    return objectPoints;
+}
+
 float Detector::computeBoardMarginWorld() const
 {
     switch (detectionParams_->patternType())
     {
     case BoardPattern::CHESSBOARD:
-        return std::static_pointer_cast<ChessboardParams>(detectionParams_)->squareSize() * 1.5f;
+        return std::static_pointer_cast<ChessboardParameters>(detectionParams_)->geometry.squareSize * 1.5f;
 
     case BoardPattern::SYMMETRIC_CIRCLES:
     case BoardPattern::ASYMMETRIC_CIRCLES:
     {
-        auto p = std::static_pointer_cast<CircleboardParams>(detectionParams_);
+        auto p = std::static_pointer_cast<CircleboardParameters>(detectionParams_);
 
-        const float halfCenterDistance = p->centerDistance() * 0.5f;
-        const float radius = p->markDiameter() * 0.5f;
+        const float halfCenterDistance = p->geometry.centerDistance * 0.5f;
+        const float radius = p->geometry.markDiameter * 0.5f;
 
         return halfCenterDistance + radius * 0.5f;
     }
+
+    case BoardPattern::CHARUCO:
+        return std::static_pointer_cast<CharucoParameters>(detectionParams_)->geometry.charuco.getSquareLength() * 1.5f;
+
+    case BoardPattern::APRIL_TAG:
+        return std::static_pointer_cast<AprilTagParameters>(detectionParams_)->geometry.aprilTag.getMarkerLength() * 1.5f;
 
     default:
         throw std::runtime_error("Unsupported pattern");
@@ -382,7 +633,7 @@ float Detector::computeBoardMarginWorld() const
 
 CvContour Detector::generateBoardContour(
     const std::vector<cv::Point2f>& imagePoints,
-    const std::vector<cv::Point3f>& worldPoints) const   // imageSize no longer needed
+    const std::vector<cv::Point3f>& worldPoints) const
 {
     if (imagePoints.size() < 4)
         throw std::runtime_error("Not enough points for homography");
@@ -428,33 +679,18 @@ CvContour Detector::generateBoardContour(
     std::vector<cv::Point2f> boardImageCorners(4);
     cv::perspectiveTransform(boardWorldCorners, boardImageCorners, H);
 
-    // 6. Convert to integer contour (already in correct order)
-    std::vector<cv::Point> contour(4);
-    for (int i = 0; i < 4; ++i)
-    {
-        contour[i] = cv::Point(
-            cvRound(boardImageCorners[i].x),
-            cvRound(boardImageCorners[i].y)
-        );
-    }
-
-    return CvContour(std::move(contour));
+    return CvContour(std::move(boardImageCorners));
 }
 
 std::vector<CvContour> Detector::generateChessboardMarksContour(const std::vector<cv::Point2f>& corners) const
 {
-    if (!detectionParams_)
-    {
-        throw std::runtime_error("Detection parameters not set");
-    }
-
     if (corners.size() < 4)
     {
         throw std::runtime_error("Wrong number of corners");
     }
 
 	std::vector<CvContour> marksContours;
-    const cv::Size& patternSize = detectionParams_->patternSize();
+    const cv::Size& patternSize = detectionParams_->getGeometry().patternSize();
 
     // Generate contours for each square/cell in the pattern
     for (int i = 0; i < patternSize.height - 1; ++i)
@@ -484,17 +720,16 @@ std::vector<CvContour> Detector::generateCirclesMarksContour(
     const std::vector<cv::Point2f>& centers,
     const std::vector<cv::Point3f>& objectPoints,
     const cv::Mat& rvec,
-    const cv::Mat& tvec
-) const
+    const cv::Mat& tvec) const
 {
     if (centers.size() != objectPoints.size())
         throw std::runtime_error("Mismatch between detected centers and object points");
 
-    auto p = std::static_pointer_cast<CircleboardParams>(detectionParams_);
+    auto p = std::static_pointer_cast<CircleboardParameters>(detectionParams_);
 
     std::vector<CvContour> marksContours;
 
-    const float realRadius = p->markDiameter() * 0.5f;  // Real-world radius (e.g., in mm)
+    const float realRadius = p->geometry.markDiameter * 0.5f;  // Real-world radius (e.g., in mm)
     const int segments = 16;  // Number of points for polygon approximation
     static constexpr float CV_PIf = static_cast<float>(CV_PI);
 
@@ -538,6 +773,17 @@ std::vector<CvContour> Detector::generateCirclesMarksContour(
     return marksContours;
 }
 
+std::vector<CvContour> Detector::generateQuadMarksContour(const std::vector<std::vector<cv::Point2f>>& markerCorners) const
+{
+    std::vector<CvContour> contours;
+    contours.reserve(markerCorners.size());
+
+    for (const auto& quad : markerCorners)
+        contours.emplace_back(quad);   // quad is already the 4 image-space corners
+
+    return contours;
+}
+
 std::vector<cv::Point2f> Detector::generateAxes2D(
     const std::vector<cv::Point3f>& objectPoints,
     const cv::Mat& rvec,
@@ -546,7 +792,7 @@ std::vector<cv::Point2f> Detector::generateAxes2D(
     if (objectPoints.empty())
         throw std::runtime_error("objectPoints is empty");
 
-    cv::Size patternSize = detectionParams_->patternSize();
+    cv::Size patternSize = detectionParams_->getGeometry().patternSize();
 
     float gridStep = cv::norm(objectPoints[1] - objectPoints[0]);
 

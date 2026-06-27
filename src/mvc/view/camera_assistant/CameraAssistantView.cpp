@@ -269,16 +269,19 @@ void CameraAssistantView::SetParameters(const std::vector<std::shared_ptr<Parame
 
 void CameraAssistantView::UpdateParameter(const std::shared_ptr<ParameterInfo>& param)
 {
-    std::shared_ptr<ParameterWidget> widget = m_cameraParameterList->GetWidget(param->name());
+    std::shared_ptr<ParameterWidget> widget = m_cameraParameterList->GetWidget(param->name(), param->category());
     if (!widget)
         return;
 
     widget->Update(param);
 }
 
-void CameraAssistantView::MarkParameterAsDirty(const wxString& paramId, bool isDirty)
+void CameraAssistantView::MarkParameterAsDirty(
+    const wxString& paramId,
+    const wxString& categoryId,
+    bool isDirty)
 {
-    std::shared_ptr<ParameterWidget> widget = m_cameraParameterList->GetWidget(paramId);
+    std::shared_ptr<ParameterWidget> widget = m_cameraParameterList->GetWidget(paramId, categoryId);
     if (!widget)
         return;
 

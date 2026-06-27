@@ -7,8 +7,9 @@ Plugin<T, DebugT>::Plugin(
     const std::string& id,
     const std::string& name,
     const std::string& description,
+    const std::vector<std::string>& dependencies,
     double threshold)
-    : PluginBase<T>(id, name, description, threshold)
+    : PluginBase<T>(id, name, description, dependencies, threshold)
 {
 }
 
@@ -72,16 +73,5 @@ std::shared_ptr<PluginResult> Plugin<T, DebugT>::executionResult(
         score,
         severity,
         debugResult
-    );
-}
-
-template<typename T, typename DebugT>
-std::shared_ptr<PluginResult> Plugin<T, DebugT>::executionNotApplicable(const std::string& message) const
-{
-    return std::make_shared<PluginResult>(
-        IPlugin::getPluginView(),
-        message,
-        0.0,
-        EvaluationSeverity::INSUFFICIENT_DATA
     );
 }

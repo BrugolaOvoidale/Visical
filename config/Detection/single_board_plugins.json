@@ -26,7 +26,7 @@
                 "min_marks_count": {
                     "value": 4
                 },
-                "mark_dilation_radius": {
+                "kernel_size": {
                     "value": 5.5
                 },
                 "sigma": {
@@ -50,7 +50,7 @@
         "enabled": true,
         "parameters": {
             "contrast": {
-                "mark_dilation_radius": {
+                "kernel_size": {
                     "value": 5.5
                 },
                 "min_detectable_contrast": {
@@ -68,7 +68,7 @@
         "enabled": true,
         "parameters": {
             "illumination": {
-                "mark_dilation_radius": {
+                "kernel_size": {
                     "value": 5.5
                 },
                 "intensity_deviation_scale": {

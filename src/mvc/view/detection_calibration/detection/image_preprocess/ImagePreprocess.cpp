@@ -53,7 +53,7 @@ void ImagePreprocess::SetParameters(
 
 void ImagePreprocess::UpdateParameter(const std::shared_ptr<ParameterInfo>& param)
 {
-    std::shared_ptr<ParameterWidget> widget = m_preProcParamsList->GetWidget(param->name());
+    std::shared_ptr<ParameterWidget> widget = m_preProcParamsList->GetWidget(param->name(), param->category());
     
     if (widget)
     {
@@ -63,9 +63,10 @@ void ImagePreprocess::UpdateParameter(const std::shared_ptr<ParameterInfo>& para
 
 void ImagePreprocess::MarkParameterAsDirty(
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
-    std::shared_ptr<ParameterWidget> widget = m_preProcParamsList->GetWidget(paramId);
+    std::shared_ptr<ParameterWidget> widget = m_preProcParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {

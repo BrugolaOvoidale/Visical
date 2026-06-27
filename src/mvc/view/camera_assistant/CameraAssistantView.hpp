@@ -149,7 +149,11 @@ public:
     void UpdateParameter(const std::shared_ptr<ParameterInfo>& param);
 
     /** @brief Visually marks a parameter as dirty. */
-    void MarkParameterAsDirty(const wxString& paramId, bool isDirty);
+    void MarkParameterAsDirty(
+        const wxString& paramId,
+        const wxString& categoryId,
+        bool isDirty
+    );
 
     /** @brief Removes all parameters. */
     void RemoveAllParameters();

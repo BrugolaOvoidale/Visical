@@ -1,5 +1,5 @@
 #pragma once
-#include <wx/window.h>
+#include <wx/frame.h>
 
 
 // Forward declarations
@@ -16,7 +16,7 @@ class wxTopLevelWindowBase;
  * window. It dynamically captures and reflects the parent's visibility and position changes
  * to ensure seamless alignment, and can toggle between a raw text message and a visual loading spinner.
  */
-class BusyOverlay : public wxWindow
+class BusyOverlay : public wxFrame
 {
 public:
     //-----------------------------------------------------------------------------
@@ -31,10 +31,10 @@ public:
 
     /**
      * @brief Constructs a new BusyOverlay instance.
-     * @param parent The window over which this overlay will be drawn and centered.
+     * @param target The window over which this overlay will be drawn and centered.
      * @note The constructor handles retrieving the top-level parent window required for tracking bounds.
      */
-    BusyOverlay(wxWindow* parent);
+    BusyOverlay(wxWindow* target);
 
     ~BusyOverlay() = default;
 
@@ -81,9 +81,12 @@ private:
     // Minimizes or restores the overlay cleanly alongside the parent frame state.
     void OnParentIconize(wxIconizeEvent& evt);
 
+    // Close this overlay when target window is destroyed
+    void OnTargetWindowDestroyed(wxWindowDestroyEvent& evt);
+
 private:
     // The immediate target parent control window frame.
-    wxWindow* m_parent;
+    wxWindow* m_target;
 
     // The ancestor top-level window tracked for synchronization.
     wxTopLevelWindowBase* m_topParent;

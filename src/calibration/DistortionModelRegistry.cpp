@@ -41,9 +41,9 @@ void DistortionModelRegistry::registerAllParameters()
 			"Distortion type",
 			std::nullopt,
 			"Selects the camera lens distortion model by defining the number and type of distortion coefficients:\n\n"
-			"- STANDARD(5 coefficients, K1–K3, P1–P2)\n"
-			"- RATIONAL(8 coefficients, adds K4–K5–K6)\n"
-			"- THIN_PRISM(12 coefficients, includes thin prism distortion S1–S4)\n"
+			"- STANDARD(5 coefficients, K1-K3, P1-P2)\n"
+			"- RATIONAL(8 coefficients, adds K4-K5-K6)\n"
+			"- THIN_PRISM(12 coefficients, includes thin prism distortion S1-S4)\n"
 			"- TILTED(14 coefficients, includes sensor tilt TauX / TauY)\n\n"
 			"The choice affects how the calibration algorithm estimates lens distortion and how many parameters are used in the distortion vector."
 		);

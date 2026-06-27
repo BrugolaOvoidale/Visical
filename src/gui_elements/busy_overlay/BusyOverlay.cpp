@@ -1,4 +1,5 @@
 #include "BusyOverlay.hpp"
+#include <wx/event.h>
 #include <wx/toplevel.h>
 #include <wx/sizer.h>
 #include <wx/activityindicator.h>
@@ -6,14 +7,14 @@
 #include <wx/dcbuffer.h>
 
 
-BusyOverlay::BusyOverlay(wxWindow* parent)
-    : wxWindow(parent, wxID_ANY,
+BusyOverlay::BusyOverlay(wxWindow* target)
+    : wxFrame(nullptr, wxID_ANY, wxEmptyString,
         wxDefaultPosition, wxDefaultSize,
-        wxTRANSPARENT_WINDOW | wxWANTS_CHARS | wxBORDER_NONE),
-    m_parent(parent)
+        wxWANTS_CHARS | wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxFRAME_TOOL_WINDOW | wxBORDER_NONE),
+    m_target(target)
 {
     SetBackgroundStyle(wxBG_STYLE_PAINT);
-    // SetTransparent(150); // semi-transparent
+    SetTransparent(150); // semi-transparent
 
     wxBoxSizer* sizer = new wxBoxSizer(wxVERTICAL);
 
@@ -40,13 +41,13 @@ BusyOverlay::BusyOverlay(wxWindow* parent)
     Hide();
 
     // Parent events
-    m_parent->Bind(wxEVT_SIZE, &BusyOverlay::OnParentUpdate, this);
-    m_parent->Bind(wxEVT_SHOW, &BusyOverlay::OnParentShow, this);
-    m_parent->Bind(wxEVT_MOVE,    &BusyOverlay::OnParentUpdate, this);
+    m_target->Bind(wxEVT_SIZE, &BusyOverlay::OnParentUpdate, this);
+    m_target->Bind(wxEVT_SHOW, &BusyOverlay::OnParentShow, this);
+    m_target->Bind(wxEVT_MOVE,    &BusyOverlay::OnParentUpdate, this);
 
     // Top-level parent move
-    m_topParent = wxStaticCast(wxGetTopLevelParent(parent), wxTopLevelWindowBase);
-    if (m_topParent && m_topParent != parent)
+    m_topParent = wxStaticCast(wxGetTopLevelParent(m_target), wxTopLevelWindowBase);
+    if (m_topParent && m_topParent != m_target)
     {
         m_topParent->Bind(wxEVT_MOVE, &BusyOverlay::OnParentUpdate, this);
         m_topParent->Bind(wxEVT_SIZE, &BusyOverlay::OnParentUpdate, this);
@@ -55,6 +56,7 @@ BusyOverlay::BusyOverlay(wxWindow* parent)
 
     // Paint
     Bind(wxEVT_PAINT, &BusyOverlay::OnPaint, this);
+    m_target->Bind(wxEVT_DESTROY, &BusyOverlay::OnTargetWindowDestroyed, this);
     //Bind(wxEVT_ERASE_BACKGROUND, [](wxEraseEvent&) {}); // prevent flicker
 }
 
@@ -62,7 +64,7 @@ BusyOverlay::BusyOverlay(wxWindow* parent)
 
 void BusyOverlay::ShowOverlay(bool show)
 {
-    if (show && m_topParent->IsShown() && !m_topParent->IsIconized() && m_parent->IsShown())
+    if (show && m_topParent->IsShown() && !m_topParent->IsIconized() && m_target->IsShown())
     {
         m_showOverlay = true;
 
@@ -122,12 +124,13 @@ void BusyOverlay::UseSpinner()
 
 void BusyOverlay::UpdatePosition()
 {
-    if (!m_parent || !m_parent->IsShown())
+    if (!m_target || !m_target->IsShown())
         return;
 
-    // Use parent's client size and position (0,0) in parent coords
-    wxSize size = m_parent->GetClientSize();
-    SetSize(0, 0, size.GetWidth(), size.GetHeight());
+    wxPoint screenPos = m_target->ClientToScreen(wxPoint(0, 0));
+    wxSize size = m_target->GetClientSize();
+
+    SetSize(screenPos.x, screenPos.y, size.x, size.y);
 
     // Ensure we stay on top of siblings
     if (IsShown())
@@ -146,7 +149,7 @@ void BusyOverlay::OnParentUpdate(wxEvent& evt)
 
 void BusyOverlay::OnParentShow(wxShowEvent& evt)
 {
-    const bool shouldShow = m_showOverlay && m_parent->IsShown();
+    const bool shouldShow = m_showOverlay && m_target->IsShown();
 
     Show(shouldShow);
 
@@ -173,4 +176,14 @@ void BusyOverlay::OnPaint(wxPaintEvent&)
     dc.SetPen(*wxTRANSPARENT_PEN);
 
     dc.DrawRectangle(GetClientRect());
+}
+
+void BusyOverlay::OnTargetWindowDestroyed(wxWindowDestroyEvent& evt)
+{
+    if (evt.GetId() != m_target->GetId())
+        return;
+
+    Close();
+
+    evt.Skip();
 }

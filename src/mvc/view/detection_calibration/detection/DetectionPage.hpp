@@ -85,6 +85,7 @@ public:
     /** @brief Flags a parameter visually to notify users that it has unsaved edits. */
     void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     ) override;
 
@@ -124,6 +125,9 @@ public:
 
     /** @brief Returns active operational configuration origins. */
     ImageSource GetImageSource() const;
+
+    /** @brief Forces selection highlight onto a specific board item. */
+    void SelectBoard(std::uint32_t id) override;
 
 private:
     wxNotebook* CreateNotebook();
@@ -248,7 +252,13 @@ private:
 
     wxBitmapButton* m_saveModelParams;
 
+    ParameterWidgetList* m_patternParamsList;
+
+    ParameterWidgetList* m_geomParamsList;
+
     ParameterWidgetList* m_detParamsList;
+
+    ParameterWidgetList* m_refineParamsList;
 };
 
 

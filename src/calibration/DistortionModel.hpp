@@ -94,7 +94,7 @@ public:
     //-----------------------------------------------------------------------------
 
     /** @brief Maps a model type to the required number of OpenCV coefficients. */
-    static int distortionTypeToCoeffsCount(Type distType);
+    static size_t distortionTypeToCoeffsCount(Type distType);
 
     /** @brief Maps a coefficient count to the corresponding model type. */
     static std::optional<Type> coeffsCountToDistortionType(size_t coeffs);
@@ -112,7 +112,7 @@ public:
     Type type() const;
 
     /** @brief Returns the number of coefficients in the current model. */
-    int coeffsCount() const;
+    size_t coeffsCount() const;
 
 private:
     // Internal helper to allocate the correctly sized cv::Mat.

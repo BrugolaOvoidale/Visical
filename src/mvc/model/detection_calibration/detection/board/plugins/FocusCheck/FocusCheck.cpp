@@ -1,13 +1,35 @@
 #include "FocusCheck.hpp"
 #include <cv/CvImage.hpp>
 #include <cv/CvRegion.hpp>
+#include <numeric>
 
+
+static double trimmedMean(
+    std::vector<double> vals,
+    double trimFraction)
+{
+    if (vals.empty()) return 0.0;
+
+    std::sort(vals.begin(), vals.end());
+
+    const size_t trimCount = std::max<size_t>(1, static_cast<size_t>(vals.size() * trimFraction));
+
+    const size_t lo = (vals.size() > 2 * trimCount) ? trimCount : 0;
+
+    const size_t hi = (vals.size() > 2 * trimCount) ? vals.size() - trimCount : vals.size();
+
+    return std::accumulate(vals.begin() + lo, vals.begin() + hi, 0.0) /
+        static_cast<double>(hi - lo);
+}
+
+/////////////////////////////////////////////////////////////
 
 FocusCheck::FocusCheck(double threshold)
     : Plugin(
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        { DEPENDENCIES.begin(), DEPENDENCIES.end() },
         threshold)
 {
 }
@@ -26,55 +48,28 @@ std::shared_ptr<FocusCheck> FocusCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> FocusCheck::executeImpl(const std::shared_ptr<Board>& board) const
+std::shared_ptr<PluginResult> FocusCheck::executeImpl(
+    const std::shared_ptr<Board>& board,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     if (!board->isDetected())
         return executionFailed("Cannot evaluate a non-detected board");
 
     try
     {
-        const CvImage& image = board->image();
+        CvImage image = board->image().toGray();
 
         const std::vector<CvContour>& marksContours = board->marksContours();
         if (marksContours.size() < minMarksCount)
             return executionFailed("Too few calibration marks detected");
 
-        const CvRegion marksRegion = CvRegion::fromContours(marksContours, false);
-        std::vector<CvRegion> singleMarksRegions;
-        singleMarksRegions.reserve(marksContours.size());
+        // Get board contrast
+        const double contrast = std::static_pointer_cast<ConstrastCheckDebug>(
+            producersResults.at(std::string(ContrastCheck::ID))->debugResult())
+            ->contrast();
 
-        // Find Contrast
-        double contrast{ 0.0 };
-        std::vector<double> range;
-        {
-            range.reserve(marksContours.size());
-
-            for (const auto& contour : marksContours)
-            {
-                CvRegion singleMark = CvRegion::fromContours({ contour }, false);
-                CvRegion dilatedSingle = singleMark.dilationCircle(markDilationRadius);
-
-                CvImage croppedImage = image.crop(dilatedSingle.boundingBox());         // small subimage
-
-                std::vector<double> singleRange;
-                croppedImage.toGray().minMaxGray(dilatedSingle, 3, nullptr, nullptr, &singleRange);
-
-                singleMarksRegions.push_back(std::move(singleMark));
-
-                if (!singleRange.empty())
-                    range.push_back(singleRange.front());
-            }
-
-            if (range.empty())
-                return executionFailed("Contrast too low to evaluate focus");
-
-            double tot = 0.0;
-            for (double r : range) tot += r;
-            contrast = tot / range.size();
-
-            if (contrast == 0.0)
-                return executionFailed("Contrast too low to evaluate focus");
-        }
+        if (contrast == 0.0)
+            return executionFailed("Contrast too low to evaluate focus");
 
         // Gauss derivative
         CvImage edgeImage = image.derivateGauss(sigma);
@@ -83,12 +78,13 @@ std::shared_ptr<PluginResult> FocusCheck::executeImpl(const std::shared_ptr<Boar
         std::vector<double> meanGradient;
         meanGradient.reserve(marksContours.size());
 
-        for (const auto& singleMark : singleMarksRegions)
+        for (const auto& singleMark : marksContours)
         {
-            CvImage croppedImage = edgeImage.crop(singleMark.boundingBox());
+            CvRegion singleMarkEdge = CvRegion::fromContours({ singleMark }, false);
+            CvImage croppedImage = edgeImage.crop(singleMarkEdge.boundingBox());
 
             std::vector<double> singleMean;
-            croppedImage.meanStdDev(singleMark, &singleMean, nullptr);
+            croppedImage.meanStdDev(singleMarkEdge, &singleMean, nullptr);
 
             if (!singleMean.empty())
                 meanGradient.push_back(singleMean.front());

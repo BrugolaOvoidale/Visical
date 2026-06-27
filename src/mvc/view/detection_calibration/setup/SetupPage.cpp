@@ -283,31 +283,35 @@ void SetupPage::SetParameters(
 void SetupPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& param)
 {
 	const wxString paramId = param->name();
+	const wxString categoryId = param->category();
 
-	std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId);
+	std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId, categoryId);
 	if (widget)
 		widget->Update(param);
     
-    widget = m_camIntrinsicsList->GetWidget(paramId);
+    widget = m_camIntrinsicsList->GetWidget(paramId, categoryId);
 	if (widget)
 		widget->Update(param);
     
-    widget = m_camMatrixList->GetWidget(paramId);
+    widget = m_camMatrixList->GetWidget(paramId, categoryId);
 	if (widget)
 		widget->Update(param);
 }
 
-void SetupPage::MarkParameterAsDirty(const wxString& paramId, bool isDirty)
+void SetupPage::MarkParameterAsDirty(
+    const wxString& paramId,
+    const wxString& categoryId,
+    bool isDirty)
 {
-    std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId);
+    std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId, categoryId);
     if (widget)
         widget->MarkAsDirty(isDirty);
 
-    widget = m_camIntrinsicsList->GetWidget(paramId);
+    widget = m_camIntrinsicsList->GetWidget(paramId, categoryId);
     if (widget)
         widget->MarkAsDirty(isDirty);
 
-    widget = m_camMatrixList->GetWidget(paramId);
+    widget = m_camMatrixList->GetWidget(paramId, categoryId);
     if (widget)
         widget->MarkAsDirty(isDirty);
 }

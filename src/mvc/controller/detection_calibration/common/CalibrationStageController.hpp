@@ -26,14 +26,6 @@ public:
 
     ~CalibrationStageController() = default;
 
-
-    //-----------------------------------------------------------------------------
-    // Class operators
-    //-----------------------------------------------------------------------------
-
-    /** @brief Safely clear resources. */
-    void shutdown();
-
 protected:
     // Protected constructor to enforce derivation.
 	// @throws std::invalid_argument if any of the required parameters are nullptr.

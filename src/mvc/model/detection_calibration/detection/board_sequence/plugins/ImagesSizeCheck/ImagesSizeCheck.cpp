@@ -6,6 +6,7 @@ ImagesSizeCheck::ImagesSizeCheck(double threshold)
 		std::string(ID),
 		std::string(NAME),
 		std::string(DESCRIPTION),
+		{},
 		threshold)
 {
 }
@@ -24,7 +25,9 @@ std::shared_ptr<ImagesSizeCheck> ImagesSizeCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> ImagesSizeCheck::executeImpl(const std::vector<std::shared_ptr<Board>>& boards) const
+std::shared_ptr<PluginResult> ImagesSizeCheck::executeImpl(
+	const std::vector<std::shared_ptr<Board>>& boards,
+	const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
 	if (boards.empty())
 	{

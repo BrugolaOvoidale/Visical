@@ -5,15 +5,15 @@
 /**
  * @brief Registry for managing common parameters for claibration board detection.
  */
-class PatternParamsRegistry : public ParameterRegistry
+class PatternParametersRegistry : public ParameterRegistry
 {
 public:
 	/** * @brief The category identifier used for grouping these parameters in the system. */
 	static const std::string& CATEGORY();
 
-	PatternParamsRegistry();
+	PatternParametersRegistry();
 
-	~PatternParamsRegistry() = default;
+	~PatternParametersRegistry() = default;
 
 private:
 	void registerAllParameters();

@@ -9,6 +9,10 @@ BaseController::BaseController(const std::shared_ptr<BaseControllerLogger>& logg
 
 /////////////////////////////////////////////////////////////////////////
 
+void BaseController::shutdown()
+{
+}
+
 void BaseController::attachLogger(const std::shared_ptr<BaseControllerLogger>& logger)
 {
 	if (!logger) return;

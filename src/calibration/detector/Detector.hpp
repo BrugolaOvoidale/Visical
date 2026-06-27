@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <opencv2/core/mat.hpp>
 #include <memory>
 #include <cv/CvContour.hpp>
@@ -6,9 +6,11 @@
 
 
 // Forward declarations
-class PatternParams;
-class ChessboardParams;
-class CircleboardParams;
+class PatternParameters;
+class ChessboardParameters;
+class CircleboardParameters;
+class CharucoParameters;
+class AprilTagParameters;
 class CvImage;
 class Board;
 
@@ -34,7 +36,7 @@ public:
      */
     Detector(
         CameraIntrinsics camIntrinsics,
-        ChessboardParams detParams
+        ChessboardParameters detParams
     );
 
     /**
@@ -44,7 +46,27 @@ public:
      */
     Detector(
         CameraIntrinsics camIntrinsics,
-        CircleboardParams detParams
+        CircleboardParameters detParams
+    );
+
+    /**
+     * @brief Constructor for ChArUco detection.
+     * @param camIntrinsics Object containing the parameters of the camera.
+     * @param detParams Object containing the ChArUco detection parameters.
+     */
+    Detector(
+        CameraIntrinsics camIntrinsics,
+        CharucoParameters detParams
+    );
+
+    /**
+     * @brief Constructor for AprilTag detection.
+     * @param camIntrinsics Object containing the parameters of the camera.
+     * @param detParams Object containing the AprilTag detection parameters.
+     */
+    Detector(
+        CameraIntrinsics camIntrinsics,
+        AprilTagParameters detParams
     );
     
     ~Detector() = default;
@@ -64,19 +86,31 @@ public:
      * @brief Configures the detector for Chessboard patterns.
      * @param detParams Parameters specifically for square-grid patterns.
      */
-    void setDetectionParameters(ChessboardParams detParams);
+    void setDetectionParameters(ChessboardParameters detParams);
 
     /**
      * @brief Configures the detector for Circle-grid patterns.
      * @param detParams Parameters specifically for symmetric/asymmetric circle patterns.
      */
-    void setDetectionParameters(CircleboardParams detParams);
+    void setDetectionParameters(CircleboardParameters detParams);
+
+    /**
+     * @brief Configures the detector for ChArUco patterns.
+     * @param detParams Parameters specifically for ChArUco patterns.
+     */
+    void setDetectionParameters(CharucoParameters detParams);
+
+    /**
+     * @brief Configures the detector for AprilTag patterns.
+     * @param detParams Parameters specifically for AprilTag patterns.
+     */
+    void setDetectionParameters(AprilTagParameters detParams);
 
     /**
      * @brief Processes an image to find and localize the calibration board.
      * @param image The input image.
      * @return A shared pointer of a Board object. Check Board::ErrorCode() to verify if detection status.
-    * @throws If invalid parameters combinations or OpenCV throws
+     * @throws If invalid parameters combinations or OpenCV throws
      */
     std::shared_ptr<Board> findBoard(const CvImage& image);
 
@@ -90,14 +124,41 @@ private:
 		std::vector<cv::Point2f> corners;
     };
 
+    // Internal structure to hold ArUco-based detection results.
+    struct FindArucoResult : public FindBoardResult {
+        std::vector<int> arucoIds;
+
+        std::vector<std::vector<cv::Point2f>> markerCorners;
+
+        std::vector<int> markerIds;
+    };
+
+    // Entirely separate pipeline from 'findBoard' for common boards.
+    std::shared_ptr<Board> findCommonTypesBoard(const CvImage& iconicImage);
+
+    // Entirely separate pipeline from 'findBoard' for ArUco-based boards.
+    std::shared_ptr<Board> findArucoBasedBoard(const CvImage& iconicImage);
+
     // Low-level OpenCV chessboard detection wrapper.
     FindBoardResult findChessboard(const cv::Mat& input) const;
 
     // Low-level OpenCV circle grid detection wrapper.
     FindBoardResult findCircleboard(const cv::Mat& input) const;
 
-    // Generate 3D object points for the calibration pattern using actual physical dimensions
-    std::vector<cv::Point3f> generateObjectPoints() const;
+    // Low-level OpenCV ChArUco detection wrapper.
+    FindArucoResult findCharucoBoard(const cv::Mat& input) const;
+
+    // Low-level OpenCV AprilTag detection wrapper.
+    FindArucoResult findAprilTagBoard(const cv::Mat& input) const;
+
+    std::vector<cv::Point3f> generateAprilTagObjectPoints(
+        const std::vector<int>& tagIds,
+        const std::shared_ptr<AprilTagParameters>& p
+    ) const;
+
+    // Builds one CvContour per detected ArUco marker, directly
+    // from the already-detected 2D marker corners.
+    std::vector<CvContour> generateQuadMarksContour(const std::vector<std::vector<cv::Point2f>>& markerCorners) const;
 
     // Generates 3D coordinates for chessboard corners
     std::vector<cv::Point3f> generateChessboardObjectPoints() const;
@@ -137,5 +198,5 @@ private:
     CameraIntrinsics camIntrinsics_;
 
     // Polymorphic storage for pattern settings.
-    std::shared_ptr<PatternParams> detectionParams_;
+    std::shared_ptr<PatternParameters> detectionParams_;
 };

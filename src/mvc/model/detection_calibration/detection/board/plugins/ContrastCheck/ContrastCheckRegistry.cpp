@@ -15,20 +15,20 @@ ContrastCheckRegistry::ContrastCheckRegistry()
 
 void ContrastCheckRegistry::registerAllParameters()
 {
-	// Mark dilation radius
+	// Kernel size
 	{
 		std::shared_ptr<Parameter> aParam = ParameterDouble::create(
-			"mark_dilation_radius",
+			"kernel_size",
 			CATEGORY,
 			AccessMode::READWRITE,
 			VisibilityLevel::BASIC,
-			ContrastCheck::Defaults::markDilationRadius,
+			ContrastCheck::Defaults::kernelSize,
 			1.0,
 			20.0,
 			0.1,
-			"Mark dilation radius",
+			"Kernel size",
 			"px",
-			"Controls the radius (in pixels) used to dilate the detected marks when computing contrast. A larger radius includes surrounding regions in the analysis, smoothing small local variations and emphasizing overall mark visibility, while a smaller radius focuses strictly on the mark contours, making the evaluation more sensitive to small, sharp features. Adjusting this can help account for camera resolution and mark size."
+			"Controls the kernel size (in pixels) used to dilate or erode the detected marks when computing contrast. For circlegrid-like patterns, this value represents the radius of the circular dilation kernel. For chessboard-like patterns, it represents the side length of the rectangular erosion kernel. A larger size includes surrounding regions in the analysis, smoothing small local variations and emphasizing overall mark visibility, while a smaller radius focuses strictly on the mark contours, making the evaluation more sensitive to small, sharp features. Adjusting this can help account for camera resolution and mark size."
 		);
 
 		registerParameter(

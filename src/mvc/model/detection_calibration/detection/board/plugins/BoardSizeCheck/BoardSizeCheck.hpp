@@ -54,7 +54,10 @@ private:
     // Private constructor to ensure instantiation via factory methods.
     BoardSizeCheck(double threshold);
 
-    std::shared_ptr<PluginResult> executeImpl(const std::shared_ptr<Board>& board) const override;
+    std::shared_ptr<PluginResult> executeImpl(
+        const std::shared_ptr<Board>& board,
+        const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults = {}
+    ) const override;
 
     void validateParameters() const override;
 

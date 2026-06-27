@@ -97,7 +97,10 @@ void CalibrationPage::SetParameters(
 
 void CalibrationPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& param)
 {
-    std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(param->name());
+    const wxString paramId = param->name();
+    const wxString categoryId = param->category();
+
+    std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -105,7 +108,7 @@ void CalibrationPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& para
     }
 
 
-    widget = m_calibParamsList->GetWidget(param->name());
+    widget = m_calibParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -113,7 +116,7 @@ void CalibrationPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& para
     }
 
 
-    widget = m_camMatrixParamsList->GetWidget(param->name());
+    widget = m_camMatrixParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -121,7 +124,7 @@ void CalibrationPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& para
     }
 
 
-    widget = m_distModelParamsList->GetWidget(param->name());
+    widget = m_distModelParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -131,9 +134,10 @@ void CalibrationPage::UpdateParameter(const std::shared_ptr<ParameterInfo>& para
 
 void CalibrationPage::MarkParameterAsDirty(
     const wxString& paramId,
+    const wxString& categoryId,
     bool isDirty)
 {
-    std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId);
+    std::shared_ptr<ParameterWidget> widget = m_distModelParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -141,7 +145,7 @@ void CalibrationPage::MarkParameterAsDirty(
     }
 
 
-    widget = m_calibParamsList->GetWidget(paramId);
+    widget = m_calibParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -149,7 +153,7 @@ void CalibrationPage::MarkParameterAsDirty(
     }
 
 
-    widget = m_camMatrixParamsList->GetWidget(paramId);
+    widget = m_camMatrixParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {
@@ -157,7 +161,7 @@ void CalibrationPage::MarkParameterAsDirty(
     }
 
 
-    widget = m_distModelParamsList->GetWidget(paramId);
+    widget = m_distModelParamsList->GetWidget(paramId, categoryId);
 
     if (widget)
     {

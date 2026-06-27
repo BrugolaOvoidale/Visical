@@ -40,3 +40,7 @@ REGISTER_MESSAGE(MessageP<std::shared_ptr<EvaluatedBoardSequence>>, MSG_BOARD_SE
 //
 REGISTER_MESSAGE(Message, MSG_PATTERN_TYPE_CHANGED);
 ////////////////////////////////////////////////////////////////////
+
+//
+REGISTER_MESSAGE(Message, MSG_SESSION_CLEARED);
+////////////////////////////////////////////////////////////////////

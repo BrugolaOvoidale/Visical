@@ -32,7 +32,10 @@ private:
     // Private constructor to ensure instantiation via factory methods.
     ImagesSizeCheck(double threshold);
 
-    std::shared_ptr<PluginResult> executeImpl(const std::vector<std::shared_ptr<Board>>& boards) const override;
+    std::shared_ptr<PluginResult> executeImpl(
+        const std::vector<std::shared_ptr<Board>>& boards,
+        const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults = {}
+    ) const override;
     
 	void validateParameters() const override;
 

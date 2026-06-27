@@ -35,27 +35,6 @@ void FocusCheckRegistry::registerAllParameters()
 			aParam->getParameterView()
 		);
 	}
-	
-	// Mark dilation radius
-	{
-		std::shared_ptr<Parameter> aParam = ParameterDouble::create(
-			"mark_dilation_radius",
-			CATEGORY,
-			AccessMode::READWRITE,
-			VisibilityLevel::BASIC,
-			FocusCheck::Defaults::markDilationRadius,
-			1.0,
-			20.0,
-			0.1,
-			"Mark dilation radius",
-			"px",
-			"Sets the radius (in pixels) used to dilate calibration mark regions before computing focus metrics. Larger values smooth out local variations and capture more surrounding pixels, reducing sensitivity to noise, while smaller values concentrate the evaluation strictly on the mark area, making the plugin more sensitive to fine focus differences."
-		);
-
-		registerParameter(
-			aParam->getParameterView()
-		);
-	}
 
 	// Sigma
 	{

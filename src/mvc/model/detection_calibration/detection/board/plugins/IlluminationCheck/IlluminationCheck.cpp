@@ -1,4 +1,5 @@
 #include "IlluminationCheck.hpp"
+#include <numeric>
 
 
 IlluminationCheck::IlluminationCheck(double threshold)
@@ -6,6 +7,7 @@ IlluminationCheck::IlluminationCheck(double threshold)
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        {},
         threshold)
 {
 }
@@ -24,7 +26,9 @@ std::shared_ptr<IlluminationCheck> IlluminationCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> IlluminationCheck::executeImpl(const std::shared_ptr<Board>& board) const
+std::shared_ptr<PluginResult> IlluminationCheck::executeImpl(
+    const std::shared_ptr<Board>& board,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     if (!board->isDetected())
         return executionFailed("Cannot evaluate a non-detected board");
@@ -32,33 +36,120 @@ std::shared_ptr<PluginResult> IlluminationCheck::executeImpl(const std::shared_p
     try
     {
         // Setup
+        const BoardPattern boardPattern = board->patternType();
         CvImage image = board->image().toGray();
         const std::vector<CvContour>& marksContours = board->marksContours();
 
         std::vector<std::vector<CvContour>> dilatedMarks;
         dilatedMarks.reserve(marksContours.size());
+
         std::vector<double> maxVals;
         maxVals.reserve(marksContours.size());
 
-        for (const auto& contour : marksContours)
+        // Tessalated grids (chessboard / charuco)
+        if (boardPattern == BoardPattern::CHESSBOARD || boardPattern == BoardPattern::CHARUCO || boardPattern == BoardPattern::APRIL_TAG)
         {
-            CvRegion localRegion = CvRegion::fromContours({ contour }, false).dilationCircle(markDilationRadius);
+            struct CellMetrics {
+                CvRegion region;
+                double maxVal;
+                double meanVal;
+                double centerX;
+                double centerY;
+                bool isLight;
+            };
+            std::vector<CellMetrics> cellsMetrics;
+            cellsMetrics.reserve(marksContours.size());
 
-            dilatedMarks.push_back(localRegion.toContours(CvRegion::ContourMode::BORDER_HOLES));
+            // Pass 1: Core sample all cells to gather metadata and coordinates
+            for (const auto& contour : marksContours)
+            {
+                // filled = true to get a solid core patch, eroded to stay away from edges
+                CvRegion erodedSingle = CvRegion::fromContours({ contour }, true).erosionRectangle(kernelSize, kernelSize);
+                CvImage croppedImage = image.crop(erodedSingle.boundingBox());
 
-            CvImage croppedImage = image.crop(localRegion.boundingBox());
+                std::vector<double> minVal;
+                std::vector<double> maxVal;
+                std::vector<double> dummy;
+                croppedImage.minMaxGray(erodedSingle, 3, &minVal, &maxVal, &dummy);
 
-            std::vector<double> singleMaxVal;
-            croppedImage.minMaxGray(localRegion, 3, nullptr, &singleMaxVal, nullptr);
+                const cv::Rect& rect = erodedSingle.boundingBox();
+                double cx = rect.x + rect.width / 2.0;
+                double cy = rect.y + rect.height / 2.0;
 
-            if (!singleMaxVal.empty())
-                maxVals.push_back(singleMaxVal.front());
+                cellsMetrics.push_back({ erodedSingle, maxVal.front(), (minVal.front() + maxVal.front()) / 2.0, cx, cy, false });
+            }
+
+            // Pass 2: Calculate automatic dynamic threshold for classification
+            const double minMean = std::min_element(cellsMetrics.begin(), cellsMetrics.end(), [](const CellMetrics& a, const CellMetrics& b) { return a.meanVal < b.meanVal; })->meanVal;
+
+            const double maxMean = std::max_element(cellsMetrics.begin(), cellsMetrics.end(), [](const CellMetrics& a, const CellMetrics& b) { return a.meanVal < b.meanVal; })->meanVal;
+
+            const double dynamicThreshold = (minMean + maxMean) / 2.0;
+
+            for (auto& cell : cellsMetrics)
+            {
+                if (cell.meanVal >= dynamicThreshold)
+                    cell.isLight = true;
+            }
+
+            // Pass 3: Map precise local illumination to maintain 1:1 contour indexing
+            for (const auto& cell : cellsMetrics)
+            {
+                double illuminationVal = 0.0;
+                if (cell.isLight)
+                {
+                    // White cells map their own internal pristine white peak
+                    illuminationVal = cell.maxVal;
+                }
+                else
+                {
+                    // Black cells borrow the illumination value of their closest white neighbor
+                    double minDistanceSq = std::numeric_limits<double>::max();
+                    double nearestWhiteMax = 255.0;
+
+                    for (const auto& refCell : cellsMetrics)
+                    {
+                        if (!refCell.isLight) continue;
+
+                        double dx = cell.centerX - refCell.centerX;
+                        double dy = cell.centerY - refCell.centerY;
+                        double distanceSq = dx * dx + dy * dy;
+
+                        if (distanceSq < minDistanceSq)
+                        {
+                            minDistanceSq = distanceSq;
+                            nearestWhiteMax = refCell.maxVal;
+                        }
+                    }
+                    illuminationVal = nearestWhiteMax;
+                }
+
+                maxVals.push_back(illuminationVal);
+                dilatedMarks.push_back(cell.region.toContours(CvRegion::ContourMode::BORDER_HOLES));
+            }
+        }
+        // Isolated patterns (circle grids)
+        else if (boardPattern == BoardPattern::SYMMETRIC_CIRCLES || boardPattern == BoardPattern::ASYMMETRIC_CIRCLES)
+        {
+            for (const auto& contour : marksContours)
+            {
+                // filled = false is perfect here; creates a hollow ring to span outwards
+                CvRegion dilatedSingle = CvRegion::fromContours({ contour }, false).dilationCircle(kernelSize);
+                dilatedMarks.push_back(dilatedSingle.toContours(CvRegion::ContourMode::BORDER_HOLES));
+
+                CvImage croppedImage = image.crop(dilatedSingle.boundingBox());
+
+                std::vector<double> singleMaxVal;
+                croppedImage.minMaxGray(dilatedSingle, 3, nullptr, &singleMaxVal, nullptr);
+
+                if (!singleMaxVal.empty())
+                    maxVals.push_back(singleMaxVal.front());
+            }
         }
 
         if (maxVals.empty())
             return executionFailed("No marks to evaluate illumination");
 
-        // Statistics
         double mean = 0.0;
         for (double v : maxVals)
             mean += v;
@@ -100,9 +191,9 @@ std::shared_ptr<PluginResult> IlluminationCheck::executeImpl(const std::shared_p
 
 void IlluminationCheck::validateParameters() const
 {
-    if (markDilationRadius <= 0.0)
+    if (kernelSize <= 0.0)
     {
-        throw std::invalid_argument("markDilationRadius must be greater than 0");
+        throw std::invalid_argument("kernelSize must be greater than 0");
 	}
 
     if (intensityDeviationScale <= 0.0)

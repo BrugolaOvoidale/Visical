@@ -40,13 +40,6 @@ CalibrationStageController::CalibrationStageController(
 
 /////////////////////////////////////////////////////
 
-void CalibrationStageController::shutdown()
-{
-    model_->BaseModel::shutdown();
-}
-
-/////////////////////////////////////////////////////
-
 void CalibrationStageController::init()
 {
     // Event bindings
@@ -631,7 +624,7 @@ void CalibrationStageController::EditParam(const ParameterChangedEvent& event)
         view_->UpdateParameter(param);
     }
 
-    view_->MarkParameterAsDirty(parameterId, model_->isParameterDirty(parameterId, categoryId));
+    view_->MarkParameterAsDirty(parameterId, categoryId, model_->isParameterDirty(parameterId, categoryId));
 
     UpdateLogs(setRes.takeLogs());
 }
@@ -655,7 +648,7 @@ void CalibrationStageController::ResetParam(const ParameterEvent& event)
     if (resetRes.isSuccess())
     {
         view_->UpdateParameter(param);
-        view_->MarkParameterAsDirty(parameterId, model_->isParameterDirty(parameterId, categoryId));
+        view_->MarkParameterAsDirty(parameterId, categoryId, model_->isParameterDirty(parameterId, categoryId));
     }
 
     UpdateLogs(resetRes.takeLogs());
@@ -724,7 +717,7 @@ void CalibrationStageController::EditPluginParam(const ParameterChangedEvent& ev
         view_->UpdatePlugin(plugin);
     }
 
-    view_->MarkPluginParameterAsDirty(pluginId, parameterId, plugin->isParameterDirty(parameterId, categoryId));
+    view_->MarkPluginParameterAsDirty(pluginId, categoryId, parameterId, plugin->isParameterDirty(parameterId, categoryId));
 }
 
 void CalibrationStageController::OnEditPluginParam(ParameterChangedEvent& event)
@@ -747,7 +740,7 @@ void CalibrationStageController::ResetPluginParam(const ParameterEvent& event)
     if (resetRes.isSuccess())
     {
         view_->UpdatePlugin(plugin);
-        view_->MarkPluginParameterAsDirty(pluginId, parameterId, plugin->isParameterDirty(parameterId, categoryId));
+        view_->MarkPluginParameterAsDirty(pluginId, categoryId, parameterId, plugin->isParameterDirty(parameterId, categoryId));
     }
 
     UpdateLogs(resetRes.takeLogs());

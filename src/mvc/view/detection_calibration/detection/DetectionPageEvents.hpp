@@ -15,9 +15,6 @@ wxDECLARE_EVENT(GUI_SNAP_CAMERA, wxCommandEvent);
 wxDECLARE_EVENT(GUI_LIVE_CAMERA, wxCommandEvent);
 
 // Payload: none
-wxDECLARE_EVENT(GUI_CHANGE_CAMERA, wxCommandEvent);
-
-// Payload: none
 wxDECLARE_EVENT(GUI_DET_REMOVE_BOARD, BoardEvent);
 
 // Payload: none

@@ -12,6 +12,7 @@
 ![OpenCV](https://img.shields.io/badge/OpenCV-4.x-orange)
 ![wxWidgets](https://img.shields.io/badge/wxWidgets-3.x-green)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows-lightgrey)
+![Release](https://img.shields.io/github/v/release/BrugolaOvoidale/Visical)
 
 # Introduction
 
@@ -26,7 +27,7 @@ Visical is a cross-platform camera calibration tool built with [OpenCV](https://
 - **Multi-source acquisition** - load images from disk, capture from webcams, or connect to GigE/USB3 Vision cameras via [Aravis](https://github.com/AravisProject/aravis).
 - **Full calibration pipeline** - OpenCV-driven board detection, pose estimation, and camera optimization in a single workflow.
   - Supports single-camera calibration. Stereo and multi-camera setups are currently out of scope.
-  - Supports chessboard and circles grid patterns.
+  - Supports **chessboard, circles grid, ChArUco**, and **AprilTag** patterns.
 - **Modular evaluation framework** - independent quality plugins assess boards and calibration results.
 Plugins are independently enabled, disabled, configured, and persisted as JSON; covers individual boards, board sequence, and final calibration metrics
 - **Cross-platform** - runs on Linux and Windows, built with C++23, CMake, and vcpkg
@@ -37,7 +38,7 @@ Plugins are independently enabled, disabled, configured, and persisted as JSON; 
 
 Prebuilt binaries are available for supported platforms through the GitHub Releases page.
 
-1. Open the repository's Releases page.
+1. Open the repository's [**Releases**](https://github.com/BrugolaOvoidale/Visical/releases) page.
 2. Download the latest package for your platform.
 3. Extract the archive.
 4. Launch Visical.
@@ -259,20 +260,16 @@ The following lists what is not yet supported and what may be addressed in the f
 
 ## Current Limitations
 
-- **Single-camera only** — stereo and multi-camera calibration setups are not supported.
+- **Single-camera only** - stereo and multi-camera calibration setups are not supported.
   Each calibration session produces intrinsics for one camera.
-- **Chessboard and circles grid only** — ArUco markers, ChArUco boards, and other
-  OpenCV-supported patterns are not yet available in the detection pipeline.
 
 ## Possible Future Directions
 
-These are not commitments — just honest candidates for future work based on
+These are not commitments, just honest candidates for future work based on
 current gaps:
 
-- **Stereo calibration** — extending the pipeline to support camera pairs and
+- **Stereo calibration** - extending the pipeline to support camera pairs and
   extrinsic estimation between them.
-- **Additional board patterns** — ArUco and ChArUco support in particular, since
-  they are more robust under partial occlusion and in low-texture scenes.
 
 Contributions addressing any of the above are welcome. See [Contributing](#contributing).
 

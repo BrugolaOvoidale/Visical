@@ -9,7 +9,7 @@
 // Forward declarations
 class CameraManager;
 class SharedCameraIntrinsics;
-class PatternParams;
+class PatternParameters;
 class Detector;
 class ICameraProxy;
 
@@ -32,6 +32,7 @@ public:
 
     /** @brief Defines the source of the detection data. */
     enum class SessionType {
+        UNDEFINED,  ///< Initial state.
         FILE,       ///< Processing images from disk.
         CAMERA      ///< Processing images from a live camera stream.
     };
@@ -96,19 +97,22 @@ public:
     );
 
     /** 
-     * @brief Requests the termination of the current live camera stream.
-     * @returns ALREADY_DONE if Live is not running, ALREADY_ACTIVE starting Live is in progress, NO_ERRORS otherwise.
+     * @brief Requests the termination of the current session.
+     * @returns ALREADY_DONE if session is not running, ALREADY_ACTIVE if a stop request is in progress, NO_ERRORS otherwise.
      */
-    TaskEnqueueResult stopLiveSession();
-
-    /** @brief Returns true if a camera is currently streaming. */
-    bool isLiveOn() const;
+    TaskEnqueueResult stopSession();
 
     /** @brief Returns true if a session is on. */
     bool isSessionOn() const;
 
-    /** @brief Gets the read-only interfaces of the detection-related parameters. */
-    std::vector<std::shared_ptr<ParameterInfo>> getDetectionParametersInfo() const;
+    /** @brief Returns true if the current CAMERA session is from a camera live stream. */
+    bool isLiveSession() const;
+
+    /** @brief Returns true if a session is starting. */
+    bool isStartingSession() const;
+
+    /** @brief Returns the current session type. */
+    SessionType sessionType() const;
 
     /** @brief Returns the optional Id of the currently active camera. */
     std::optional<std::string> getWorkingCameraId() const;
@@ -195,14 +199,11 @@ private:
     //  Sets the active camera by Id.
     void setWorkingCameraId(const std::string& cameraId);
 
-    // Clears current session-realted resources.
+    // Clears current session-related resources.
     void clearSession();
 
     // Initiates a live acquisition task.
     TaskEnqueueResult startLive(const std::string& cameraId);
-
-    // Signals the live acquisition to stop.
-    TaskEnqueueResult stopLive();
 
     // Takes a single snapshot from the active camera.
     TaskEnqueueResult takeSnapshot(const std::string& cameraId);
@@ -311,7 +312,7 @@ private:
     
     const std::unordered_map<std::string_view, std::function<std::shared_ptr<PluginContext>()>>& getSequencePluginsFactory() const override;
 
-    TaskResultP<std::shared_ptr<PatternParams>> getDetectionParameters() const;
+    TaskResultP<std::shared_ptr<PatternParameters>> getDetectionParameters() const;
 
     std::shared_ptr<const ParameterOwner> getSharedParameterOwner() const override;
 
@@ -334,23 +335,20 @@ private:
     void onCameraTakeSnap(const TaskResultP<std::shared_ptr<const CvImage>>& snapResult);
 
 private:
+    // Indicates the type of the current session.
+    std::atomic<SessionType> sessionType_{ SessionType::UNDEFINED };
+
+    // Control flag to indicate if a current CAMERA session is from a camera live stream.
+    std::atomic<bool> isLiveSession_{ false };
+
 	// Control flag to indicate if a session is currently active.
     std::atomic<bool> isSessionOn_{ false };
 
-	// Indicates the type of the current session.
-    std::atomic<SessionType> sessionType_{ SessionType::FILE };
+    // Control flag to indicate if a session start is requested.
+    std::atomic<bool> requestStartSession_{ false };
 
-	// Indicates if a new session request is requested.
-    std::atomic<bool> newSessionRequested_{ false };    // Control flag if the camera id is currently beign used
-
-	// Control flag to indicate if a Live session termination is requested.
-    std::atomic<bool> requestStopLive_{ false };
-
-	// Indicates if a ew live session request is requested.
-    std::atomic<bool> isTryingLive_{ false };
-
-	// Control flag to indicate if Live is currently running.
-    std::atomic<bool> isLive_{ false };
+	// Control flag to indicate if a session termination is requested.
+    std::atomic<bool> requestStopSession_{ false };
 
     // Control flag for the re-run boards request
     std::atomic<bool> rerunRequested_{ false };

@@ -7,16 +7,35 @@ PluginBase<T>::PluginBase(
     const std::string& id,
     const std::string& name,
     const std::string& description,
+    const std::vector<std::string>& dependencies,
     double threshold)
-    : IPlugin(id, name, description, threshold)
+    : IPlugin(id, name, description, dependencies, threshold)
 {
 }
 
 ///////////////////////////////////////////////////////////
 
 template<typename T>
-std::shared_ptr<PluginResult> PluginBase<T>::execute(const T& object) const
+std::shared_ptr<PluginResult> PluginBase<T>::execute(
+    const T& object,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
+    // Check dependencies
+    for (const auto& id : dependencies())
+    {
+        auto it = producersResults.find(id);
+        if (it == producersResults.end())
+        {
+            return executionNotApplicable("Producer " + id + " not available");
+        }
+
+        const EvaluationSeverity prodSev = it->second->severity();
+        if (prodSev == EvaluationSeverity::FAILED || prodSev == EvaluationSeverity::INSUFFICIENT_DATA)
+        {
+            return executionNotApplicable("Producer " + id + " is not usable");
+        }
+    }
+
     // Validation
     try
     {
@@ -30,7 +49,7 @@ std::shared_ptr<PluginResult> PluginBase<T>::execute(const T& object) const
     // Execution
     try
     {
-        return executeImpl(object);
+        return executeImpl(object, producersResults);
     }
     catch (const std::exception& ex)
     {
@@ -48,7 +67,18 @@ std::shared_ptr<PluginResult> PluginBase<T>::executionFailed(const std::string& 
     return std::make_shared<PluginResult>(
         getPluginView(),
         message,
-        0.0,
+        -1.0,
         EvaluationSeverity::FAILED
+    );
+}
+
+template<typename T>
+std::shared_ptr<PluginResult> PluginBase<T>::executionNotApplicable(const std::string& message) const
+{
+    return std::make_shared<PluginResult>(
+        IPlugin::getPluginView(),
+        message,
+        -1.0,
+        EvaluationSeverity::INSUFFICIENT_DATA
     );
 }

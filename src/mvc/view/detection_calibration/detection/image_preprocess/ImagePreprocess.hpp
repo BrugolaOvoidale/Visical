@@ -56,10 +56,12 @@ public:
     /**
      * @brief Marks a specific parameter to show it has unsaved changes.
      * @param paramId The unique identifier string of the target parameter.
+     * @param categoryId The unique identifier string of the target parameter category.
      * @param isDirty Pass true to mark as modified/unsaved, false to clear the flag.
      */
     void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     );
 

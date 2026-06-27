@@ -57,7 +57,7 @@ public:
     //-----------------------------------------------------------------------------
 
     /** @brief Tells the Model to shutdown.*/
-    void shutdown();
+    void shutdown() override;
 
     /** @brief Show and restore focus on the GUI. */
     void OpenView();

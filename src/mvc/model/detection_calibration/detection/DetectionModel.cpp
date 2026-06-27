@@ -5,18 +5,22 @@
 #include <camera_manager/ICameraProxy.hpp>
 #include <calibration/Board.hpp>
 #include <calibration/detector/Detector.hpp>
-#include <calibration/detector/ChessboardParams.hpp>
-#include <calibration/detector/CircleboardParams.hpp>
-#include <calibration/detector/PatternParamsRegistry.hpp>
-#include <calibration/detector/ChessboardParamsRegistry.hpp>
-#include <calibration/detector/CircleboardParamsRegistry.hpp>
+#include <calibration/detector/ChessboardParameters.hpp>
+#include <calibration/detector/CircleboardParameters.hpp>
+#include <calibration/detector/CharucoParameters.hpp>
+#include <calibration/detector/AprilTagParameters.hpp>
+#include <calibration/detector/PatternParametersRegistry.hpp>
+#include <calibration/detector/ChessboardParametersRegistry.hpp>
+#include <calibration/detector/CircleboardParametersRegistry.hpp>
+#include <calibration/detector/ArucoParametersRegistry.hpp>
+#include <calibration/detector/CharucoParametersRegistry.hpp>
+#include <calibration/detector/AprilTagParametersRegistry.hpp>
 #include "DetectionModelRegistry.hpp"
 #include "board/BoardPlugins.hpp"
 #include "board/EvaluatedBoard.hpp"
 #include "board_sequence/BoardSequencePlugins.hpp"
 #include "board_sequence/EvaluatedBoardSequence.hpp"
 #include "../SharedCameraIntrinsics.hpp"
-//#include <windows.hpp>
 
 
 DetectionModel::DetectionModel(
@@ -68,7 +72,7 @@ std::shared_ptr<DetectionModel> DetectionModel::create(
 
 void DetectionModel::shutdown()
 {
-    stopLive();
+    stopSession();
 }
 
 TaskEnqueueResult DetectionModel::startFileSession(const std::vector<std::string>& filePaths)
@@ -78,15 +82,29 @@ TaskEnqueueResult DetectionModel::startFileSession(const std::vector<std::string
         return { TaskEnqueueResult::Status::REJECTED, { "Images path is empty", Log::Level::LVL_ERROR } };
     }
 
-    // If there is a session going on AND it is of a different type,
+    if (isSessionOn())
+    {
+        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Session is already on", Log::Level::LVL_INFO } };
+    }
+
+    if (isStartingSession())
+    {
+        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Already trying to start a session", Log::Level::LVL_INFO } };
+    }
+
+    requestStartSession_.store(true);
+
+    // If there the previous session was of a different type,
     // signal that a new session has been requested,
     // so this one will replace it
-    if (isSessionOn_.exchange(true) && sessionType_.load() != SessionType::FILE)
-    {
-        newSessionRequested_.store(true);
+    const DetectionModel::SessionType prevSessionType = sessionType_.load();
 
-        sessionType_.store(SessionType::FILE);
+    if (prevSessionType != SessionType::UNDEFINED && prevSessionType != SessionType::FILE)
+    {
+        clearSession();
     }
+
+    sessionType_.store(SessionType::FILE);
 
     enqueueMessageTask(
         MSG_BOARD_FROM_IMAGE,
@@ -109,41 +127,76 @@ TaskEnqueueResult DetectionModel::startCameraSession(
         return { TaskEnqueueResult::Status::REJECTED, { "Camera id is empty", Log::Level::LVL_ERROR } };
     }
 
-    // If there is a session going on AND it is of a different type,
+    if (isSessionOn())
+    {
+        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Session is already on", Log::Level::LVL_INFO } };
+    }
+
+    if (isStartingSession())
+    {
+        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Already trying to start a session", Log::Level::LVL_INFO } };
+    }
+
+    requestStartSession_.store(true);
+
+    // If there the previous session was of a different type,
+    // OR the working camera changed,
     // signal that a new session has been requested,
     // so this one will replace it
-    if (isSessionOn_.exchange(true) &&
-        (sessionType_.load() != SessionType::CAMERA || cameraId != getWorkingCameraId()))
-    {
-        newSessionRequested_.store(true);
+    const DetectionModel::SessionType prevSessionType = sessionType_.load();
+    const std::optional<std::string> prevCamId = getWorkingCameraId();
 
-        sessionType_.store(SessionType::CAMERA);
+    if ((prevSessionType != SessionType::UNDEFINED) &&
+        (prevSessionType != SessionType::CAMERA || (prevCamId.has_value() && cameraId != prevCamId.value())))
+    {
+        clearSession();
 
         setWorkingCameraId(cameraId);
     }
+
+    sessionType_.store(SessionType::CAMERA);
 
     TaskEnqueueResult res;
 
     if (snap)
     {
+        isLiveSession_.store(false);
+
         res = takeSnapshot(cameraId);
     }
     else
     {
+        isLiveSession_.store(true);
+
         res = startLive(cameraId);
+    }
+
+    if (res.getStatus() == TaskEnqueueResult::Status::REJECTED)
+    {
+        requestStartSession_.store(false);
+
+        requestStopSession_.store(false);
     }
 
     return res;
 }
 
-TaskEnqueueResult DetectionModel::stopLiveSession()
+TaskEnqueueResult DetectionModel::stopSession()
 {
-    return stopLive();
-}
+    // Check if a session is On
+    if (!isSessionOn())
+    {
+        return { TaskEnqueueResult::Status::ALREADY_DONE, { "Session is not running", Log::Level::LVL_INFO } };
+    }
 
-bool DetectionModel::isLiveOn() const
-{
-    return isLive_.load();
+    // "If it was already true, bail out. Otherwise, I now own the run."
+    if (requestStopSession_.exchange(true))
+    {
+        // Already running, no-op
+        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Already trying to stopping session", Log::Level::LVL_INFO } };
+    }
+
+    return TaskEnqueueResult::Status::NO_ERRORS;
 }
 
 bool DetectionModel::isSessionOn() const
@@ -151,48 +204,19 @@ bool DetectionModel::isSessionOn() const
     return isSessionOn_.load();
 }
 
-std::vector<std::shared_ptr<ParameterInfo>> DetectionModel::getDetectionParametersInfo() const
+bool DetectionModel::isLiveSession() const
 {
-    std::vector<std::shared_ptr<ParameterInfo>> vec;
-    vec.reserve(10); // Worst case scenario
-    vec.push_back(getRequiredParameter("pattern_type", PatternParamsRegistry::CATEGORY()));
-    vec.push_back(getRequiredParameter("pattern_cols", PatternParamsRegistry::CATEGORY()));
-    vec.push_back(getRequiredParameter("pattern_rows", PatternParamsRegistry::CATEGORY()));
+    return isLiveSession_.load();
+}
 
-    BoardPattern pattern = UtilityFunctions::enumFromString<BoardPattern>(
-        getRequiredParameter("pattern_type", PatternParamsRegistry::CATEGORY())->getValue<std::string>()
-    ).value();
+bool DetectionModel::isStartingSession() const
+{
+    return requestStartSession_.load();
+}
 
-    switch (pattern)
-    {
-    case BoardPattern::CHESSBOARD:
-    {
-        vec.push_back(getRequiredParameter("square_size", ChessboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("search_accuracy", ChessboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("adaptive_threshold", ChessboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("normalize_image", ChessboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("filter_quads", ChessboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("subpixel_accuracy", ChessboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("allow_larger_boards", ChessboardParamsRegistry::CATEGORY));
-
-        break;
-    }
-
-    case BoardPattern::SYMMETRIC_CIRCLES:
-    case BoardPattern::ASYMMETRIC_CIRCLES:
-    {
-        vec.push_back(getRequiredParameter("mark_diameter", CircleboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("center_distance", CircleboardParamsRegistry::CATEGORY));
-        vec.push_back(getRequiredParameter("use_clustering", CircleboardParamsRegistry::CATEGORY));
-
-        break;
-    }
-
-    default:
-        break;
-    }
-
-    return vec;
+DetectionModel::SessionType DetectionModel::sessionType() const
+{
+    return sessionType_.load();
 }
 
 std::optional<std::string> DetectionModel::getWorkingCameraId() const
@@ -300,7 +324,7 @@ TaskResult DetectionModel::setParameter(
 
     if (result.isSuccess())
     {
-        if (paramId == "pattern_type" && categoryId == PatternParamsRegistry::CATEGORY())
+        if (paramId == "pattern_type" && categoryId == PatternParametersRegistry::CATEGORY())
         {
             publish(Message(MSG_PATTERN_TYPE_CHANGED));
         }
@@ -353,7 +377,7 @@ TaskResult DetectionModel::resetParameter(
 
     if (result.isSuccess())
     {
-        if (paramId == "pattern_type" && categoryId == PatternParamsRegistry::CATEGORY())
+        if (paramId == "pattern_type" && categoryId == PatternParametersRegistry::CATEGORY())
         {
             publish(Message(MSG_PATTERN_TYPE_CHANGED));
         }
@@ -461,14 +485,23 @@ void DetectionModel::createDomainParameters()
     DetectionModelRegistry modelRegistry;
     UtilityFunctions::moveInto(modelRegistry.getAllParameters(), infoVec);
 
-    PatternParamsRegistry baseDetParamsRegistry;
+    PatternParametersRegistry baseDetParamsRegistry;
     UtilityFunctions::moveInto(baseDetParamsRegistry.getAllParameters(), infoVec);
 
-    ChessboardParamsRegistry chessboardParamsRegistry;
+    ChessboardParametersRegistry chessboardParamsRegistry;
     UtilityFunctions::moveInto(chessboardParamsRegistry.getAllParameters(), infoVec);
 
-    CircleboardParamsRegistry circleBoardParamsRegistry;
+    CircleboardParametersRegistry circleBoardParamsRegistry;
     UtilityFunctions::moveInto(circleBoardParamsRegistry.getAllParameters(), infoVec);
+
+    ArucoParametersRegistry arucoBoardParamsRegistry;
+    UtilityFunctions::moveInto(arucoBoardParamsRegistry.getAllParameters(), infoVec);
+
+    CharucoParametersRegistry charucoBoardParamsRegistry;
+    UtilityFunctions::moveInto(charucoBoardParamsRegistry.getAllParameters(), infoVec);
+
+    AprilTagParametersRegistry aprilTagParamsRegistry;
+    UtilityFunctions::moveInto(aprilTagParamsRegistry.getAllParameters(), infoVec);
 
     initParameters(std::move(infoVec));
 }
@@ -506,16 +539,13 @@ void DetectionModel::clearSession()
         currCameraId_.reset();
     }
 
+    publish(Message(MSG_SESSION_CLEARED));
+
     reEvaluateSequence();
 }
 
 TaskEnqueueResult DetectionModel::startLive(const std::string& cameraId)
 {
-    if (isLiveOn())
-    {
-        return { TaskEnqueueResult::Status::ALREADY_DONE, { "Already in Live", Log::Level::LVL_INFO } };
-    }
-
     std::shared_ptr<ICameraProxy> cam = cameraManager_->getCameraProxy(cameraId);
     if (!cam)
     {
@@ -526,22 +556,13 @@ TaskEnqueueResult DetectionModel::startLive(const std::string& cameraId)
         return { TaskEnqueueResult::Status::REJECTED, { "Camera is not connected", Log::Level::LVL_ERROR } };
     }
 
-    // "If it was already true, bail out. Otherwise, I now own the run."
-    if (isTryingLive_.exchange(true))
-    {
-        // Already running, no-op
-        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Already trying to starting Live", Log::Level::LVL_INFO } };
-    }
-
     cam->subscribe(MSG_STOP_GRABBING, &DetectionModel::onCameraStopGrab, this);
 
     TaskEnqueueResult res;
 
     if (cam->isGrabbing())
     {
-        findBoardFromLiveTask(cameraId);
-
-        res = TaskEnqueueResult::Status::NO_ERRORS;
+        res = findBoardFromLiveTask(cameraId);
     }
     else
     {
@@ -554,31 +575,10 @@ TaskEnqueueResult DetectionModel::startLive(const std::string& cameraId)
             cam->unsubscribe(MSG_START_GRABBING, &DetectionModel::onCameraStartGrab, this);
 
             cam->unsubscribe(MSG_STOP_GRABBING, &DetectionModel::onCameraStopGrab, this);
-
-            isTryingLive_.store(false);
-            isSessionOn_.store(false);
         }
     }
 
     return res;
-}
-
-TaskEnqueueResult DetectionModel::stopLive()
-{
-    // Check if Model is in Live
-    if (!isLiveOn() && !isTryingLive_.load())
-    {
-        return { TaskEnqueueResult::Status::ALREADY_DONE, { "Live is not running", Log::Level::LVL_INFO } };
-    }
-
-    // "If it was already true, bail out. Otherwise, I now own the run."
-    if (requestStopLive_.exchange(true))
-    {
-        // Already running, no-op
-        return { TaskEnqueueResult::Status::ALREADY_ACTIVE, { "Already trying to stopping Live", Log::Level::LVL_INFO } };
-    }
-
-    return TaskEnqueueResult::Status::NO_ERRORS;
 }
 
 TaskEnqueueResult DetectionModel::takeSnapshot(const std::string& cameraId)
@@ -602,8 +602,12 @@ TaskEnqueueResult DetectionModel::takeSnapshot(const std::string& cameraId)
 
 TaskEnqueueResult DetectionModel::findBoardFromSnapTask(const std::shared_ptr<const CvImage>& image)
 {
+    requestStartSession_.store(false);
+
     if (!image)
     {
+        requestStopSession_.store(false);
+
         return { TaskEnqueueResult::Status::REJECTED, { "image is nullptr", Log::Level::LVL_ERROR } };
     }
 
@@ -627,27 +631,37 @@ TaskEnqueueResult DetectionModel::findBoardFromLiveTask(const std::string& camer
         return { TaskEnqueueResult::Status::REJECTED, { "Camera " + cameraId + " not found in camera manager", Log::Level::LVL_ERROR } };
     }
 
-    TaskResultP<std::shared_ptr<PatternParams>> detParamsRes = getDetectionParameters();
+    TaskResultP<std::shared_ptr<PatternParameters>> detParamsRes = getDetectionParameters();
 
     if (!detParamsRes.isSuccess())
     {
         return { TaskEnqueueResult::Status::REJECTED, detParamsRes.takeLogs() };
     }
 
-    std::shared_ptr<PatternParams> detParams = detParamsRes.getPayload();
+    std::shared_ptr<PatternParameters> detParams = detParamsRes.getPayload();
 
     std::optional<Detector> opt_detector;
 
     switch (detParams->patternType())
     {
         case BoardPattern::CHESSBOARD:
-            opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParams>(detParams));
+            opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParameters>(detParams));
 
             break;
 
         case BoardPattern::SYMMETRIC_CIRCLES:
         case BoardPattern::ASYMMETRIC_CIRCLES:
-            opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParams>(detParams));
+            opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParameters>(detParams));
+
+            break;
+
+        case BoardPattern::CHARUCO:
+            opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CharucoParameters>(detParams));
+
+            break;
+
+        case BoardPattern::APRIL_TAG:
+            opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<AprilTagParameters>(detParams));
 
             break;
 
@@ -657,17 +671,15 @@ TaskEnqueueResult DetectionModel::findBoardFromLiveTask(const std::string& camer
 
     std::shared_ptr<Detector> detector = std::make_shared<Detector>(std::move(opt_detector.value()));
 
-
 	// TODO: is this really the best way to do this?
     // Maybe 'MSG_BOARD_FROM_LIVE' should not be a MessageTask
     // and I should mimic 1:1 ICamera grab loop?
 
-    isLive_.store(true);
-    isTryingLive_.store(false);
-
     publish(MessageTask::pending(MSG_BOARD_FROM_LIVE));
 
     worker_.enqueueTask([this, cam, detector]() {
+        requestStartSession_.store(false);
+        isSessionOn_.store(true);
 
         publish(MessageTask::started(MSG_BOARD_FROM_LIVE));
 
@@ -682,7 +694,7 @@ void DetectionModel::scheduleNextLiveDetection(
     const std::shared_ptr<ICameraProxy>& cam,
     const std::shared_ptr<Detector>& detector)
 {
-    if (!requestStopLive_.load())
+    if (!requestStopSession_.load())
     {
         worker_.enqueueTask(&DetectionModel::doFindBoardFromLive, this, cam, detector);
     }
@@ -694,15 +706,13 @@ void DetectionModel::scheduleNextLiveDetection(
 
 void DetectionModel::finalizeLiveDetectionLoop(const std::shared_ptr<ICameraProxy>& cam)
 {
-    // Model should react to camera start grabbing ONLY if someone called 'findBoardFromLive()'
-    // otherwise it means other parties started its acquisition, and Model should not care
-    cam->unsubscribe(MSG_START_GRABBING, &DetectionModel::onCameraStartGrab, this);
+    TaskEnqueueResult stopCamGrab;
+    if (cam->isGrabbing())
+        stopCamGrab = cam->stopGrab();
 
-    TaskEnqueueResult stopCamGrab = cam->stopGrab();
-
-    requestStopLive_.store(false);
-    isLive_.store(false);
     isSessionOn_.store(false);
+
+    requestStopSession_.store(false);
 
     publish(MessageTask::success(MSG_BOARD_FROM_LIVE));
 
@@ -787,36 +797,60 @@ TaskEnqueueResult DetectionModel::reEvaluateSequence(
 
 TaskResult DetectionModel::doFindBoardFromImages(const std::vector<std::string>& filePaths)
 {
+    requestStartSession_.store(false);
+    isSessionOn_.store(true);
+
     if (filePaths.empty())
     {
+        isSessionOn_.store(false);
+
+        requestStopSession_.store(false);
+
         return { false, { "Images path is empty", Log::Level::LVL_ERROR } };
     }
 
-    TaskResultP<std::shared_ptr<PatternParams>> detParamsRes = getDetectionParameters();
+    TaskResultP<std::shared_ptr<PatternParameters>> detParamsRes = getDetectionParameters();
 
     if (!detParamsRes.isSuccess())
     {
+        isSessionOn_.store(false);
+
+        requestStopSession_.store(false);
+
         return { false, detParamsRes.takeLogs() };
     }
 
-    std::shared_ptr<PatternParams> detParams = detParamsRes.getPayload();
+    std::shared_ptr<PatternParameters> detParams = detParamsRes.getPayload();
 
     std::optional<Detector> opt_detector;
 
     switch (detParams->patternType())
     {
     case BoardPattern::CHESSBOARD:
-		opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParams>(detParams));
+		opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParameters>(detParams));
 
         break;
 
     case BoardPattern::SYMMETRIC_CIRCLES:
     case BoardPattern::ASYMMETRIC_CIRCLES:
-        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParams>(detParams));
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParameters>(detParams));
+
+        break;
+
+    case BoardPattern::CHARUCO:
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CharucoParameters>(detParams));
+
+        break;
+
+    case BoardPattern::APRIL_TAG:
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<AprilTagParameters>(detParams));
 
         break;
 
     default:
+        isSessionOn_.store(false);
+        requestStopSession_.store(false);
+
         return { false, { "Board pattern type not supported", Log::Level::LVL_ERROR } };
     }
 
@@ -830,7 +864,18 @@ TaskResult DetectionModel::doFindBoardFromImages(const std::vector<std::string>&
 
         // Find calibration object
 
-        std::shared_ptr<Board> board = detector.findBoard(transImage);
+        std::shared_ptr<Board> board;
+        
+        try
+        {
+            board = detector.findBoard(transImage);
+        }
+        catch (const std::exception& ex)
+        {
+            UpdateLogs(Log("Error image '" + path + "' -> " + ex.what(), Log::Level::LVL_ERROR));
+
+            continue;
+        }
 
         std::shared_ptr<EvaluatedBoard> evalBoard = std::make_shared<EvaluatedBoard>(
             std::move(boardEval_->evaluate(board))
@@ -838,12 +883,8 @@ TaskResult DetectionModel::doFindBoardFromImages(const std::vector<std::string>&
 
         std::shared_ptr<DetectionResultFile> detRes = std::make_shared<DetectionResultFile>(evalBoard, path);
 
-        if (newSessionRequested_.load())
+        if (requestStopSession_.exchange(false))
         {
-            clearSession();
-
-            newSessionRequested_.store(false);
-
             break;
         }
         else
@@ -861,37 +902,62 @@ TaskResult DetectionModel::doFindBoardFromImages(const std::vector<std::string>&
 
 TaskResult DetectionModel::doFindBoardFromSnap(const std::shared_ptr<const CvImage>& originalImage)
 {
+    requestStartSession_.store(false);
+    isSessionOn_.store(true);
+
     if (!originalImage)
     {
+        isSessionOn_.store(false);
+
+        requestStopSession_.store(false);
+
         return { false, { "Image is nullptr", Log::Level::LVL_ERROR } };
     }
 
 
-    TaskResultP<std::shared_ptr<PatternParams>> detParamsRes = getDetectionParameters();
+    TaskResultP<std::shared_ptr<PatternParameters>> detParamsRes = getDetectionParameters();
 
     if (!detParamsRes.isSuccess())
     {
+        isSessionOn_.store(false);
+
+        requestStopSession_.store(false);
+
         return { false, detParamsRes.takeLogs() };
     }
 
-    std::shared_ptr<PatternParams> detParams = detParamsRes.getPayload();
+    std::shared_ptr<PatternParameters> detParams = detParamsRes.getPayload();
 
     std::optional<Detector> opt_detector;
 
     switch (detParams->patternType())
     {
     case BoardPattern::CHESSBOARD:
-        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParams>(detParams));
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParameters>(detParams));
 
         break;
 
     case BoardPattern::SYMMETRIC_CIRCLES:
     case BoardPattern::ASYMMETRIC_CIRCLES:
-        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParams>(detParams));
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParameters>(detParams));
+
+        break;
+
+    case BoardPattern::CHARUCO:
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CharucoParameters>(detParams));
+
+        break;
+
+    case BoardPattern::APRIL_TAG:
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<AprilTagParameters>(detParams));
 
         break;
 
     default:
+        isSessionOn_.store(false);
+
+        requestStopSession_.store(false);
+
         return { false, { "Board pattern type not supported", Log::Level::LVL_ERROR } };
     }
 
@@ -900,7 +966,20 @@ TaskResult DetectionModel::doFindBoardFromSnap(const std::shared_ptr<const CvIma
     // Find calibration object
     CvImage transImage = preprocessImage(*originalImage);
 
-    std::shared_ptr<Board> board = detector.findBoard(transImage);
+    std::shared_ptr<Board> board;
+
+    try
+    {
+        board = detector.findBoard(transImage);
+    }
+    catch (const std::exception& ex)
+    {
+        isSessionOn_.store(false);
+
+        requestStopSession_.store(false);
+
+        return { false, Log(std::string("Error detection -> ") + ex.what(), Log::Level::LVL_ERROR) };
+    }
 
     std::shared_ptr<EvaluatedBoard> evalBoard = std::make_shared<EvaluatedBoard>(
         std::move(boardEval_->evaluate(board))
@@ -908,13 +987,7 @@ TaskResult DetectionModel::doFindBoardFromSnap(const std::shared_ptr<const CvIma
 
     std::shared_ptr<DetectionResult> detRes = std::make_shared<DetectionResultSnap>(evalBoard);
 
-    if (newSessionRequested_.load())
-    {
-        clearSession();
-
-        newSessionRequested_.store(false);
-    }
-    else
+    if (!requestStopSession_.exchange(false))
     {
         storeDetectionResult(detRes, originalImage);
 
@@ -942,54 +1015,69 @@ void DetectionModel::doFindBoardFromLive(
 
     CvImage transImage = preprocessImage(*originalImage);
 
-    std::shared_ptr<Board> board = detector->findBoard(transImage);
+    std::shared_ptr<Board> board;
+
+    try
+    {
+        board = detector->findBoard(transImage);
+    }
+    catch (const std::exception& ex)
+    {
+        UpdateLogs(Log(std::string("Error image -> ") + ex.what(), Log::Level::LVL_ERROR));
+
+        scheduleNextLiveDetection(cam, detector);
+
+        return;
+    }
 
     std::shared_ptr<EvaluatedBoard> evalBoard = std::make_shared<EvaluatedBoard>(
         std::move(boardEval_->evaluate(board))
     );
 
-    if (newSessionRequested_.load())
-    {
-        clearSession();
-
-        newSessionRequested_.store(false);
-
-        stopLive();
-    }
-    else
+    if (!requestStopSession_.load())
     {
         storeLiveDetectionResult(
             std::make_shared<DetectionResultLive>(evalBoard),
             originalImage
         );
-
-        scheduleNextLiveDetection(cam, detector);
     }
+
+    scheduleNextLiveDetection(cam, detector);
 }
 
 TaskResult DetectionModel::doRerunAllBoards()
 {
-    TaskResultP<std::shared_ptr<PatternParams>> detParamsRes = getDetectionParameters();
+    TaskResultP<std::shared_ptr<PatternParameters>> detParamsRes = getDetectionParameters();
 
     if (!detParamsRes.isSuccess())
     {
         return { false, detParamsRes.takeLogs() };
     }
 
-    std::shared_ptr<PatternParams> detParams = detParamsRes.getPayload();
+    std::shared_ptr<PatternParameters> detParams = detParamsRes.getPayload();
 
     std::optional<Detector> opt_detector;
 
     switch (detParams->patternType())
     {
     case BoardPattern::CHESSBOARD:
-		opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParams>(detParams));
+		opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<ChessboardParameters>(detParams));
 
         break;
 
     case BoardPattern::SYMMETRIC_CIRCLES:
     case BoardPattern::ASYMMETRIC_CIRCLES:
-        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParams>(detParams));
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CircleboardParameters>(detParams));
+
+        break;
+
+    case BoardPattern::CHARUCO:
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<CharucoParameters>(detParams));
+
+        break;
+
+    case BoardPattern::APRIL_TAG:
+        opt_detector = Detector(*camIntrinsics_->get(), *std::static_pointer_cast<AprilTagParameters>(detParams));
 
         break;
 
@@ -1019,7 +1107,19 @@ TaskResult DetectionModel::doRerunAllBoards()
         CvImage transImage = preprocessImage(*img);
 
         // Find calibration board
-        std::shared_ptr<Board> board = detector.findBoard(transImage);
+
+        std::shared_ptr<Board> board;
+
+        try
+        {
+            board = detector.findBoard(transImage);
+        }
+        catch (const std::exception& ex)
+        {
+            UpdateLogs(Log("Error image '" + std::to_string(id.get()) + "' -> " + ex.what(), Log::Level::LVL_ERROR));
+
+            continue;
+        }
 
         std::shared_ptr<EvaluatedBoard> evalBoard = std::make_shared<EvaluatedBoard>(
             std::move(boardEval_->evaluate(board))
@@ -1126,7 +1226,7 @@ TaskResult DetectionModel::doReEvaluateAllBoardsSingleCheck(
         else
         {
             newEvalBoard = std::make_shared<EvaluatedBoard>(
-                boardEval_->removeEvaluation(*res->evaluatedBoard(), pluginId)
+                boardEval_->updateEvaluation(*res->evaluatedBoard(), pluginId)
             );
         }
 
@@ -1198,7 +1298,7 @@ TaskResultP<std::shared_ptr<EvaluatedBoardSequence>> DetectionModel::doReEvaluat
             else
             {
                 newEval = std::make_shared<EvaluatedBoardSequence>(
-                    boardSeqEval_->removeEvaluation(*oldEval, pluginId)
+                    boardSeqEval_->updateEvaluation(*oldEval, pluginId)
                 );
             }
         }
@@ -1246,7 +1346,14 @@ CvImage DetectionModel::preprocessImage(const CvImage& input)
 
     if (rotDeg != 0)
     {
-        transformedImage = transformedImage.rotate(static_cast<float>(rotDeg));
+        try
+        {
+            transformedImage = transformedImage.rotate(static_cast<float>(rotDeg));
+        }
+        catch (const std::exception& ex)
+        {
+            UpdateLogs(Log(ex.what(), Log::Level::LVL_ERROR));
+        }
     }
 
     if (mirrorX)
@@ -1364,71 +1471,359 @@ const std::unordered_map<std::string_view, std::function<std::shared_ptr<PluginC
     return BoardSequencePlugins::factories();
 }
 
-TaskResultP<std::shared_ptr<PatternParams>> DetectionModel::getDetectionParameters() const
+TaskResultP<std::shared_ptr<PatternParameters>> DetectionModel::getDetectionParameters() const
 {
-    const BoardPattern pattern = UtilityFunctions::enumFromString<BoardPattern>(
-        getRequiredParameter("pattern_type", PatternParamsRegistry::CATEGORY())->getValue<std::string>()
-    ).value();
-    const int patternCols = getRequiredParameter("pattern_cols", PatternParamsRegistry::CATEGORY())->getValue<int>();
-    const int patternRows = getRequiredParameter("pattern_rows", PatternParamsRegistry::CATEGORY())->getValue<int>();
+    std::optional<std::shared_ptr<PatternParameters>> detParams;
 
-
-    std::shared_ptr<PatternParams> detParams;
-
-    switch (pattern)
+    try
     {
-    case BoardPattern::CHESSBOARD:
-    {
-        std::shared_ptr<ChessboardParams> chessParams = std::make_shared<ChessboardParams>(
-            patternCols,
-            patternRows,
-            static_cast<float>(getRequiredParameter("square_size", ChessboardParamsRegistry::CATEGORY)->getValue<double>())
-        );
-
-        chessParams->searchAccuracy = UtilityFunctions::enumFromString<ChessboardParams::SearchAccuracy >(
-            getRequiredParameter("search_accuracy", ChessboardParamsRegistry::CATEGORY)->getValue<std::string>()
+        const BoardPattern pattern = UtilityFunctions::enumFromString<BoardPattern>(
+            getRequiredParameter("pattern_type", PatternParametersRegistry::CATEGORY())->getValue<std::string>()
         ).value();
+        const int patternCols = getRequiredParameter("pattern_cols", PatternParametersRegistry::CATEGORY())->getValue<int>();
+        const int patternRows = getRequiredParameter("pattern_rows", PatternParametersRegistry::CATEGORY())->getValue<int>();
 
-        chessParams->adaptiveThreshold = getRequiredParameter("adaptive_threshold", ChessboardParamsRegistry::CATEGORY)->getValue<bool>();
+        switch (pattern)
+        {
+        case BoardPattern::CHESSBOARD:
+        {
+            ChessboardParameters::Geometry g(
+                patternCols,
+                patternRows,
+                static_cast<float>(getRequiredParameter("square_size", ChessboardParametersRegistry::CATEGORY_GEOMETRY)->getValue<double>())
+            );
 
-        chessParams->normalizeImage = getRequiredParameter("normalize_image", ChessboardParamsRegistry::CATEGORY)->getValue<bool>();
 
-        chessParams->filterQuads = getRequiredParameter("filter_quads", ChessboardParamsRegistry::CATEGORY)->getValue<bool>();
+            ChessboardParameters::Detection d;
 
-        chessParams->subpixelAccuracy = getRequiredParameter("subpixel_accuracy", ChessboardParamsRegistry::CATEGORY)->getValue<bool>();
+            d.searchAccuracy = UtilityFunctions::enumFromString<ChessboardParameters::Detection::SearchAccuracy >(
+                getRequiredParameter("search_accuracy", ChessboardParametersRegistry::CATEGORY_DETECTION)->getValue<std::string>()
+            ).value();
 
-        chessParams->allowLargerBoards = getRequiredParameter("allow_larger_boards", ChessboardParamsRegistry::CATEGORY)->getValue<bool>();
+            d.adaptiveThreshold = getRequiredParameter("adaptive_threshold", ChessboardParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
 
-        detParams = chessParams;
+            d.normalizeImage = getRequiredParameter("normalize_image", ChessboardParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
 
-        break;
+            d.filterQuads = getRequiredParameter("filter_quads", ChessboardParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
+
+            d.subpixelAccuracy = getRequiredParameter("subpixel_accuracy", ChessboardParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
+
+            d.allowLargerBoards = getRequiredParameter("allow_larger_boards", ChessboardParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
+
+
+            ChessboardParameters::Refine r;
+
+            r.type = UtilityFunctions::enumFromString<ChessboardParameters::Refine::TermCriteriaType >(
+                getRequiredParameter("term_criteria_type", ChessboardParametersRegistry::CATEGORY_REFINE)->getValue<std::string>()
+            ).value();
+
+            r.maxCount = getRequiredParameter("max_iterations", ChessboardParametersRegistry::CATEGORY_REFINE)->getValue<int>();
+
+            r.epsilon = getRequiredParameter("epsilon", ChessboardParametersRegistry::CATEGORY_REFINE)->getValue<double>();
+
+            std::shared_ptr<ChessboardParameters> chessParams = std::make_shared<ChessboardParameters>(std::move(g));
+
+            chessParams->detection = std::move(d);
+
+            chessParams->refine = std::move(r);
+
+            detParams = chessParams;
+
+            break;
+        }
+
+        case BoardPattern::SYMMETRIC_CIRCLES:
+        case BoardPattern::ASYMMETRIC_CIRCLES:
+        {
+            CircleboardParameters::Geometry g(
+                patternCols,
+                patternRows,
+                static_cast<float>(getRequiredParameter("mark_diameter", CircleboardParametersRegistry::CATEGORY_GEOMETRY)->getValue<double>()),
+                static_cast<float>(getRequiredParameter("center_distance", CircleboardParametersRegistry::CATEGORY_GEOMETRY)->getValue<double>())
+            );
+
+
+            CircleboardParameters::Detection d;
+
+            d.useClustering = getRequiredParameter("use_clustering", CircleboardParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
+
+            std::shared_ptr<CircleboardParameters> circleParams = std::make_shared<CircleboardParameters>(
+                std::move(g),
+                pattern == BoardPattern::ASYMMETRIC_CIRCLES ? true : false
+            );
+
+            circleParams->detection = std::move(d);
+
+            detParams = circleParams;
+
+            break;
+        }
+
+        case BoardPattern::CHARUCO:
+        {
+            CharucoParameters::Geometry g({
+                cv::Size(patternCols, patternRows),
+                static_cast<float>(getRequiredParameter("square_size", CharucoParametersRegistry::CATEGORY_GEOMETRY)->getValue<double>()),
+                static_cast<float>(getRequiredParameter("marker_length", ArucoParametersRegistry::CATEGORY_GEOMETRY())->getValue<double>()),
+                cv::aruco::getPredefinedDictionary(getRequiredParameter("dictionary", CharucoParametersRegistry::CATEGORY_GEOMETRY)->getValue<int>())
+                });
+
+            CharucoParameters::Detection d;
+
+            d.charuco.minMarkers = getRequiredParameter("min_markers", CharucoParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+            d.charuco.tryRefineMarkers = getRequiredParameter("try_refine_markers", CharucoParametersRegistry::CATEGORY_DETECTION)->getValue<bool>();
+
+            d.arucoDetector.adaptiveThreshWinSizeMin =
+                getRequiredParameter("adaptive_thresh_win_size_min", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.adaptiveThreshWinSizeMax =
+                getRequiredParameter("adaptive_thresh_win_size_max", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.adaptiveThreshWinSizeStep =
+                getRequiredParameter("adaptive_thresh_win_size_step", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.adaptiveThreshConstant =
+                getRequiredParameter("adaptive_thresh_constant", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minMarkerPerimeterRate =
+                getRequiredParameter("min_marker_perimeter_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.maxMarkerPerimeterRate =
+                getRequiredParameter("max_marker_perimeter_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.polygonalApproxAccuracyRate =
+                getRequiredParameter("polygonal_approx_accuracy_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minCornerDistanceRate =
+                getRequiredParameter("min_corner_distance_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minDistanceToBorder =
+                getRequiredParameter("min_distance_to_border", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.minMarkerDistanceRate =
+                getRequiredParameter("min_marker_distance_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minGroupDistance =
+                getRequiredParameter("min_group_distance", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.cornerRefinementMethod = getRequiredParameter("corner_refinement_method", CharucoParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+
+            d.arucoDetector.cornerRefinementWinSize =
+                getRequiredParameter("corner_refinement_win_size", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.relativeCornerRefinmentWinSize =
+                getRequiredParameter("relative_corner_refinement_win_size", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.cornerRefinementMaxIterations =
+                getRequiredParameter("corner_refinement_max_iterations", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.cornerRefinementMinAccuracy =
+                getRequiredParameter("corner_refinement_min_accuracy", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.markerBorderBits =
+                getRequiredParameter("marker_border_bits", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.perspectiveRemovePixelPerCell =
+                getRequiredParameter("perspective_remove_pixel_per_cell", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.perspectiveRemoveIgnoredMarginPerCell =
+                getRequiredParameter("perspective_remove_ignored_margin_per_cell", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.maxErroneousBitsInBorderRate =
+                getRequiredParameter("max_erroneous_bits_in_border_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minOtsuStdDev =
+                getRequiredParameter("min_otsu_std_dev", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.errorCorrectionRate =
+                getRequiredParameter("error_correction_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.detectInvertedMarker =
+                getRequiredParameter("detect_inverted_marker", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<bool>();
+
+            d.arucoDetector.useAruco3Detection =
+                getRequiredParameter("use_aruco3_detection", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<bool>();
+
+            d.arucoDetector.minSideLengthCanonicalImg =
+                getRequiredParameter("min_side_length_canonical_img", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.minMarkerLengthRatioOriginalImg =
+                getRequiredParameter("min_marker_length_ratio_original_img", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+
+            CharucoParameters::Refine r;
+
+            r.arucoRefine.minRepDistance =
+                getRequiredParameter("min_rep_distance", ArucoParametersRegistry::CATEGORY_REFINE())->getValue<double>();
+
+            r.arucoRefine.errorCorrectionRate =
+                getRequiredParameter("error_correction_rate", ArucoParametersRegistry::CATEGORY_REFINE())->getValue<double>();
+
+            r.arucoRefine.checkAllOrders =
+                getRequiredParameter("check_all_orders", ArucoParametersRegistry::CATEGORY_REFINE())->getValue<bool>();
+
+            std::shared_ptr<CharucoParameters> charucoParams = std::make_shared<CharucoParameters>(std::move(g));
+
+            charucoParams->detection = std::move(d);
+
+            charucoParams->refine = std::move(r);
+
+            detParams = charucoParams;
+
+            break;
+        }
+
+        case BoardPattern::APRIL_TAG:
+        {
+            const cv::aruco::PredefinedDictionaryType dict = static_cast<cv::aruco::PredefinedDictionaryType>(getRequiredParameter("dictionary", AprilTagParametersRegistry::CATEGORY_GEOMETRY)->getValue<int>());
+
+            AprilTagParameters::Geometry g({
+                cv::Size(patternCols, patternRows),
+                static_cast<float>(getRequiredParameter("marker_length", ArucoParametersRegistry::CATEGORY_GEOMETRY())->getValue<double>()),
+                static_cast<float>(getRequiredParameter("marker_separation", AprilTagParametersRegistry::CATEGORY_GEOMETRY)->getValue<double>()),
+                cv::aruco::getPredefinedDictionary(dict)
+                },
+                dict
+            );
+
+            ArucoParameters::Detection d;
+
+            d.arucoDetector.adaptiveThreshWinSizeMin =
+                getRequiredParameter("adaptive_thresh_win_size_min", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.adaptiveThreshWinSizeMax =
+                getRequiredParameter("adaptive_thresh_win_size_max", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.adaptiveThreshWinSizeStep =
+                getRequiredParameter("adaptive_thresh_win_size_step", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.adaptiveThreshConstant =
+                getRequiredParameter("adaptive_thresh_constant", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minMarkerPerimeterRate =
+                getRequiredParameter("min_marker_perimeter_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.maxMarkerPerimeterRate =
+                getRequiredParameter("max_marker_perimeter_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.polygonalApproxAccuracyRate =
+                getRequiredParameter("polygonal_approx_accuracy_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minCornerDistanceRate =
+                getRequiredParameter("min_corner_distance_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minDistanceToBorder =
+                getRequiredParameter("min_distance_to_border", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.minMarkerDistanceRate =
+                getRequiredParameter("min_marker_distance_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minGroupDistance =
+                getRequiredParameter("min_group_distance", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.cornerRefinementMethod = getRequiredParameter("corner_refinement_method", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+
+            d.arucoDetector.cornerRefinementWinSize =
+                getRequiredParameter("corner_refinement_win_size", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.relativeCornerRefinmentWinSize =
+                getRequiredParameter("relative_corner_refinement_win_size", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.cornerRefinementMaxIterations =
+                getRequiredParameter("corner_refinement_max_iterations", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.cornerRefinementMinAccuracy =
+                getRequiredParameter("corner_refinement_min_accuracy", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.markerBorderBits =
+                getRequiredParameter("marker_border_bits", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.perspectiveRemovePixelPerCell =
+                getRequiredParameter("perspective_remove_pixel_per_cell", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.perspectiveRemoveIgnoredMarginPerCell =
+                getRequiredParameter("perspective_remove_ignored_margin_per_cell", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.maxErroneousBitsInBorderRate =
+                getRequiredParameter("max_erroneous_bits_in_border_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.minOtsuStdDev =
+                getRequiredParameter("min_otsu_std_dev", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.errorCorrectionRate =
+                getRequiredParameter("error_correction_rate", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+            d.arucoDetector.aprilTagQuadDecimate =
+                getRequiredParameter("april_tag_quad_decimate", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<double>();
+
+            d.arucoDetector.aprilTagQuadSigma =
+                getRequiredParameter("april_tag_quad_sigma", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<double>();
+
+            d.arucoDetector.aprilTagMinClusterPixels =
+                getRequiredParameter("april_tag_min_cluster_pixels", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+
+            d.arucoDetector.aprilTagMaxNmaxima =
+                getRequiredParameter("april_tag_max_nmaxima", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+
+            d.arucoDetector.aprilTagCriticalRad =
+                getRequiredParameter("april_tag_critical_rad", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<double>();
+
+            d.arucoDetector.aprilTagMaxLineFitMse =
+                getRequiredParameter("april_tag_max_line_fit_mse", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<double>();
+
+            d.arucoDetector.aprilTagMinWhiteBlackDiff =
+                getRequiredParameter("april_tag_min_white_black_diff", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+
+            d.arucoDetector.aprilTagDeglitch =
+                getRequiredParameter("april_tag_deglitch", AprilTagParametersRegistry::CATEGORY_DETECTION)->getValue<int>();
+
+            d.arucoDetector.detectInvertedMarker =
+                getRequiredParameter("detect_inverted_marker", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<bool>();
+
+            d.arucoDetector.useAruco3Detection =
+                getRequiredParameter("use_aruco3_detection", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<bool>();
+
+            d.arucoDetector.minSideLengthCanonicalImg =
+                getRequiredParameter("min_side_length_canonical_img", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<int>();
+
+            d.arucoDetector.minMarkerLengthRatioOriginalImg =
+                getRequiredParameter("min_marker_length_ratio_original_img", ArucoParametersRegistry::CATEGORY_DETECTION())->getValue<double>();
+
+
+            ArucoParameters::Refine r;
+
+            r.arucoRefine.minRepDistance =
+                getRequiredParameter("min_rep_distance", ArucoParametersRegistry::CATEGORY_REFINE())->getValue<double>();
+
+            r.arucoRefine.errorCorrectionRate =
+                getRequiredParameter("error_correction_rate", ArucoParametersRegistry::CATEGORY_REFINE())->getValue<double>();
+
+            r.arucoRefine.checkAllOrders =
+                getRequiredParameter("check_all_orders", ArucoParametersRegistry::CATEGORY_REFINE())->getValue<bool>();
+
+            std::shared_ptr<AprilTagParameters> aprilTagParams = std::make_shared<AprilTagParameters>(std::move(g));
+
+            aprilTagParams->detection = std::move(d);
+
+            aprilTagParams->refine = std::move(r);
+
+            detParams = aprilTagParams;
+
+            break;
+        }
+
+        default:
+            break;
+        }
+
+        if (!detParams.has_value())
+        {
+            return { std::nullopt, { "Unsupported board pattern", Log::Level::LVL_ERROR } };
+        }
     }
-
-    case BoardPattern::SYMMETRIC_CIRCLES:
-    case BoardPattern::ASYMMETRIC_CIRCLES:
+    catch (const std::exception& ex)
     {
-        std::shared_ptr<CircleboardParams> circleParams = std::make_shared<CircleboardParams>(
-            patternCols,
-            patternRows,
-            static_cast<float>(getRequiredParameter("mark_diameter", CircleboardParamsRegistry::CATEGORY)->getValue<double>()),
-            static_cast<float>(getRequiredParameter("center_distance", CircleboardParamsRegistry::CATEGORY)->getValue<double>()),
-            pattern == BoardPattern::ASYMMETRIC_CIRCLES ? true : false
-        );
-
-        circleParams->useClustering = getRequiredParameter("use_clustering", CircleboardParamsRegistry::CATEGORY)->getValue<bool>();
-
-        detParams = circleParams;
-
-        break;
-    }
-
-    default:
-        break;
-    }
-
-    if (!detParams)
-    {
-        return { std::nullopt, { "Unsupported board pattern", Log::Level::LVL_ERROR } };
+        return { std::nullopt, { ex.what(), Log::Level::LVL_ERROR}};
     }
 
     return detParams;
@@ -1466,16 +1861,18 @@ void DetectionModel::cameraStartGrab(const MessageTask& message)
 
             if (enqueueRes.getStatus() == TaskEnqueueResult::Status::REJECTED)
             {
-                isTryingLive_.store(false);
-                isSessionOn_.store(false);
+                requestStartSession_.store(false);
+
+                requestStopSession_.store(false);
 
                 publish(MessageTask::rejected(MSG_BOARD_FROM_LIVE, enqueueRes.takeLogs()));
             }
         }
         else
         {
-            isTryingLive_.store(false);
-            isSessionOn_.store(false);
+            requestStartSession_.store(false);
+
+            requestStopSession_.store(false);
 
             publish(
                 MessageTask::rejected(MSG_BOARD_FROM_LIVE, { Log{ "Camera " + cameraId + " not found in camera manager", Log::Level::LVL_ERROR } })
@@ -1486,6 +1883,9 @@ void DetectionModel::cameraStartGrab(const MessageTask& message)
     }
 
     case MessageTask::TaskStatus::FAIL:
+        requestStartSession_.store(false);
+
+        requestStopSession_.store(false);
 
         const std::string cameraId = message.context().getAttribute<std::string>(CAM_SERIAL);
 
@@ -1494,14 +1894,12 @@ void DetectionModel::cameraStartGrab(const MessageTask& message)
         {
             cam->unsubscribe(MSG_START_GRABBING, &DetectionModel::onCameraStartGrab, this);
             cam->unsubscribe(MSG_STOP_GRABBING, &DetectionModel::onCameraStopGrab, this);
-
-            publish(
-                MessageTask::rejected(MSG_BOARD_FROM_LIVE, { Log{ "Camera " + cameraId + " : failed to starting camera grab", Log::Level::LVL_ERROR } })
-            );
         }
 
-        isTryingLive_.store(false);
-        isSessionOn_.store(false);
+        publish(
+            MessageTask::rejected(MSG_BOARD_FROM_LIVE, { Log{ "Camera " + cameraId + " : failed to starting camera grab", Log::Level::LVL_ERROR } })
+        );
+
         break;
     }
 
@@ -1547,7 +1945,7 @@ void DetectionModel::externalCameraStopGrab(const MessageTask& message)
 {
     // Some external module requested to stop camera grabbing:
     // tell the Model to stop its Live
-    stopLive();    // Don't care about the output, nothing fatal could return
+    stopSession();    // Don't care about the output, nothing fatal could return
 
     switch (message.status())
     {
@@ -1593,7 +1991,7 @@ void DetectionModel::externalCameraStopGrab(const MessageTask& message)
 void DetectionModel::onCameraStopGrab(const MessageTask& message)
 {
     // If this stop request does come from
-    if (requestStopLive_.load())
+    if (requestStopSession_.load())
     {
 		worker_.enqueueTask(&DetectionModel::internalCameraStopGrab, this, message);
     }
@@ -1611,11 +2009,19 @@ void DetectionModel::cameraTakeSnap(const TaskResultP<std::shared_ptr<const CvIm
 
         if (enqueueRes.getStatus() == TaskEnqueueResult::Status::REJECTED)
         {
+            requestStartSession_.store(false);
+
+            requestStopSession_.store(false);
+
             publish(MessageTask::rejected(MSG_BOARD_FROM_SNAP, enqueueRes.takeLogs()));
         }
     }
     else
     {
+        requestStartSession_.store(false);
+
+        requestStopSession_.store(false);
+
         publish(MessageTask::rejected(MSG_BOARD_FROM_SNAP, { Log{ "Failed to take camera snapshot", Log::Level::LVL_ERROR } }));
     }
 

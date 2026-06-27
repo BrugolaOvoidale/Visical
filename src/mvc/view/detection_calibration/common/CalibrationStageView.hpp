@@ -133,7 +133,7 @@ public:
     );
 
     /** @brief Forces selection highlight onto a specific board item. */
-    void SelectBoard(std::uint32_t id);
+    virtual void SelectBoard(std::uint32_t id);
 
     /** @brief Removes a unique board entry from the visualization tracking data. */
     void RemoveBoard(std::uint32_t id);
@@ -159,11 +159,13 @@ public:
      * @brief Flags a plugin configuration attribute as modified/dirty.
      * @param pluginId Targeted plugin identifier.
      * @param paramId Unique property keyword.
+     * @param categoryId Unique category keyword.
      * @param isDirty true to mark it out-of-sync; false to mark clean.
      */
     void MarkPluginParameterAsDirty(
         const wxString& pluginId,
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     );
 
@@ -240,6 +242,7 @@ public:
      */
     virtual void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     ) = 0;
 

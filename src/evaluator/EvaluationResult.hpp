@@ -43,7 +43,7 @@ public:
      */
     EvaluationResult(
         const T& object,
-        const std::vector<std::shared_ptr<PluginResult>>& assessments = {}
+        std::vector<std::shared_ptr<PluginResult>> assessments = {}
     );
 
     ~EvaluationResult() = default;

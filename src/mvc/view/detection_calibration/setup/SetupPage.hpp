@@ -86,10 +86,12 @@ public:
     /**
      * @brief Visually marks a parameter field to represent unsaved local changes.
      * @param paramId Unique text key string specifying the parameter tracking node.
+     * @param paramId Unique text key string specifying the parameter category.
      * @param isDirty Flag state where true indicates uncommitted/edited modifications.
      */
     void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     );
 

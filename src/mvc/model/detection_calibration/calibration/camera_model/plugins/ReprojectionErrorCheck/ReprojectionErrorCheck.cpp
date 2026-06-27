@@ -7,6 +7,7 @@ ReprojectionErrorCheck::ReprojectionErrorCheck(double threshold)
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        {},
         threshold)
 {
 }
@@ -25,7 +26,9 @@ std::shared_ptr<ReprojectionErrorCheck> ReprojectionErrorCheck::create(double th
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> ReprojectionErrorCheck::executeImpl(const CameraModel& camModel) const
+std::shared_ptr<PluginResult> ReprojectionErrorCheck::executeImpl(
+    const CameraModel& camModel,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     const double reprojError = camModel.reprojectionError();
 

@@ -6,8 +6,13 @@ IPlugin::IPlugin(
     const std::string& id,
     const std::string& name,
     const std::string& description,
+    const std::vector<std::string>& dependencies,
     double threshold)
-    : id_(id), name_(name), description_(description), threshold_(threshold)
+    : id_(id),
+    name_(name),
+    description_(description),
+    dependencies_(dependencies),
+    threshold_(threshold)
 {
 }
 
@@ -26,6 +31,11 @@ const std::string& IPlugin::name() const
 const std::string& IPlugin::description() const
 {
     return description_;
+}
+
+const std::vector<std::string>& IPlugin::dependencies() const
+{
+    return dependencies_;
 }
 
 double IPlugin::getThreshold() const

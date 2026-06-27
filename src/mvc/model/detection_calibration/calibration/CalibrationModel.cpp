@@ -805,7 +805,7 @@ void CalibrationModel::doReEvaluateAllBoardsSingleCheck(
             {
                 newEvalCalibBoards.emplace_back(
                     entry.mapId(),
-                    boardEval_->removeEvaluation(entry.evaluatedCalibratedBoard(), pluginId)
+                    boardEval_->updateEvaluation(entry.evaluatedCalibratedBoard(), pluginId)
                 );
             }
         }
@@ -865,7 +865,7 @@ void CalibrationModel::doReEvaluateSequenceSingleCheck(
         }
         else
         {
-            newEval = boardSeqEval_->removeEvaluation(lastCalibRes.evaluatedCameraModel(), pluginId);
+            newEval = boardSeqEval_->updateEvaluation(lastCalibRes.evaluatedCameraModel(), pluginId);
         }
 
         std::unique_lock lock(lastCalibResultMutex_);

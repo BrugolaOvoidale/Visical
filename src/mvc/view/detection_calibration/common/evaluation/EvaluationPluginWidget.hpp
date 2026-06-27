@@ -63,10 +63,12 @@ public:
     /**
      * @brief Flags a specific parameter visually if its value has unsaved changes.
      * @param paramId Unique identifier of the parameter.
+     * @param categoryId Unique identifier of the parameter category.
      * @param isDirty True to show modified styling; false to revert to standard styling.
      */
     void MarkParameterAsDirty(
         const wxString& paramId,
+        const wxString& categoryId,
         bool isDirty
     );
 

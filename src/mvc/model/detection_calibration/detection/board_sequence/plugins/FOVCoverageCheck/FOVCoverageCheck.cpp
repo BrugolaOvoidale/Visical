@@ -8,6 +8,7 @@ FOVCoverageCheck::FOVCoverageCheck(double threshold)
         std::string(ID),
         std::string(NAME),
         std::string(DESCRIPTION),
+        {},
         threshold)
 {
 }
@@ -26,7 +27,9 @@ std::shared_ptr<FOVCoverageCheck> FOVCoverageCheck::create(double threshold)
 
 /////////////////////////////////////////////////////////////
 
-std::shared_ptr<PluginResult> FOVCoverageCheck::executeImpl(const std::vector<std::shared_ptr<Board>>& boards) const
+std::shared_ptr<PluginResult> FOVCoverageCheck::executeImpl(
+    const std::vector<std::shared_ptr<Board>>& boards,
+    const std::unordered_map<std::string, std::shared_ptr<PluginResult>>& producersResults) const
 {
     try
     {
@@ -63,7 +66,7 @@ std::shared_ptr<PluginResult> FOVCoverageCheck::executeImpl(const std::vector<st
         if (imagePoints.empty())
             return executionFailed("Observation points invalid");
 
-        double avgMarksDiameter = marksDiameters.empty() ? 0.0 :
+        const double avgMarksDiameter = marksDiameters.empty() ? 0.0 :
             std::accumulate(marksDiameters.begin(), marksDiameters.end(), 0.0) /
             marksDiameters.size();
 

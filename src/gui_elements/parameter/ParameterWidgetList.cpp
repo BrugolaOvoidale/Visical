@@ -40,37 +40,57 @@ void ParameterWidgetList::SetParameters(const std::vector<std::shared_ptr<Parame
     BaseWidgetList::SetWidgets(widgets);
 }
 
-std::shared_ptr<ParameterWidget> ParameterWidgetList::GetWidget(const wxString& parameterId)
+std::shared_ptr<ParameterWidget> ParameterWidgetList::GetWidget(
+    const wxString& parameterId,
+    const wxString& categoryId)
 {
-    auto it = m_parameterIdtoItem.find(parameterId);
+    auto it = m_parameterIdtoItem.find(categoryId);
     if (it == m_parameterIdtoItem.end())
         return nullptr;
 
-	return it->second;
+    auto pIt = it->second.find(parameterId);
+    if (pIt == it->second.end())
+        return nullptr;
+
+	return pIt->second;
 }
 
-void ParameterWidgetList::RemoveParameter(const wxString& toRemoveId)
+void ParameterWidgetList::RemoveParameter(
+    const wxString& parameterId,
+    const wxString& categoryId)
 {
-    auto it = m_parameterIdtoItem.find(toRemoveId);
-    if (it == m_parameterIdtoItem.end()) return;
+    auto it = m_parameterIdtoItem.find(categoryId);
+    if (it == m_parameterIdtoItem.end())
+        return;
+
+    auto pIt = it->second.find(parameterId);
+    if (pIt == it->second.end())
+        return;
 
 
-    std::shared_ptr<ParameterWidget> parameter = it->second;
+    std::shared_ptr<ParameterWidget> parameter = pIt->second;
 
-    m_parameterIdtoItem.erase(toRemoveId);
+    it->second.erase(parameterId);
 
-    m_itemToParameterId.erase(parameter);
+    m_itemToParameterId.at(categoryId).erase(parameter);
 
     BaseWidgetList::RemoveWidget(parameter);
 }
 
-bool ParameterWidgetList::SelectParameter(const wxString& parameterId)
+bool ParameterWidgetList::SelectParameter(
+    const wxString& parameterId,
+    const wxString& categoryId)
 {
-    auto it = m_parameterIdtoItem.find(parameterId);
-    if (it == m_parameterIdtoItem.end()) return false;
+    auto it = m_parameterIdtoItem.find(categoryId);
+    if (it == m_parameterIdtoItem.end())
+        return false;
 
-    it->second->SetSelected(true);
-    m_selectedWidget = it->second;
+    auto pIt = it->second.find(parameterId);
+    if (pIt == it->second.end())
+        return false;
+
+    pIt->second->SetSelected(true);
+    m_selectedWidget = pIt->second;
 
     return true;
 }
@@ -79,12 +99,16 @@ bool ParameterWidgetList::SelectParameter(const wxString& parameterId)
 
 std::shared_ptr<ParameterWidget> ParameterWidgetList::CreateWidget(const std::shared_ptr<ParameterInfo>& param)
 {
-    auto it = m_parameterIdtoItem.find(param->name());
+    auto it = m_parameterIdtoItem.find(param->category());
     if (it != m_parameterIdtoItem.end())
     {
-        it->second->Update(param);
+        auto pIt = it->second.find(param->name());
+        if (pIt != it->second.end())
+        {
+            pIt->second->Update(param);
 
-        return it->second;
+            return pIt->second;
+        }
     }
 
     std::shared_ptr<ParameterWidget> parameter;
@@ -154,8 +178,8 @@ std::shared_ptr<ParameterWidget> ParameterWidgetList::CreateWidget(const std::sh
     }
 
 
-    m_parameterIdtoItem[param->name()] = parameter;
-    m_itemToParameterId[parameter] = param->name();
+    m_parameterIdtoItem[param->category()][param->name()] = parameter;
+    m_itemToParameterId[param->category()][parameter] = param->name();
 
     // Bind
     parameter->Bind(GUI_SELECT_PARAM, &ParameterWidgetList::OnWidgetClicked, this);
@@ -167,11 +191,12 @@ void ParameterWidgetList::RemoveSelectedWidgetImpl(const std::shared_ptr<BaseWid
 {
     std::shared_ptr<ParameterWidget> toRemoveWidget = std::static_pointer_cast<ParameterWidget>(baseWidget);
 
-    const wxString toRemoveId = m_itemToParameterId.at(toRemoveWidget);
+    const wxString categoryId = toRemoveWidget->GetCategoryId();
+    const wxString toRemoveId = toRemoveWidget->GetParameterId();
 
-    m_itemToParameterId.erase(toRemoveWidget);
+    m_itemToParameterId.at(categoryId).erase(toRemoveWidget);
 
-    m_parameterIdtoItem.erase(toRemoveId);
+    m_parameterIdtoItem.at(categoryId).erase(toRemoveId);
 }
 
 void ParameterWidgetList::RemoveAllWidgetsImpl()

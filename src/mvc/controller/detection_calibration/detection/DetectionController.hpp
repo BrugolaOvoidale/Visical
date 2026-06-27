@@ -54,6 +54,9 @@ public:
     // Class operators
     //-----------------------------------------------------------------------------
 
+    /** @brief Safely clear resources. */
+    void shutdown() override;
+
     /** @brief Retrieves the list of currently detected calibration boards. */
     std::vector<std::shared_ptr<Board>> getDetectedBoards() const;
 
@@ -114,6 +117,7 @@ private:
     void OnRemoveBoard(BoardEvent& event);
 
     // Remove All Boards
+    void ClearSessionView();
     void RemoveAllBoards() override;
     void OnRemoveAllBoards(wxCommandEvent& event);
 
@@ -132,10 +136,6 @@ private:
     // Live camera acquisition
     void LiveCamera();
     void OnLiveCamera(const wxCommandEvent& event);
-
-    // Change Camera
-	void ChangeCamera(const wxString& cameraId);
-	void OnChangeCamera(const wxCommandEvent& event);
 
     // Show plugin debug result
     void ShowPerBoardDebugResult(const wxCommandEvent& event);
@@ -197,6 +197,9 @@ private:
 
     //
     void onPatternTypeChanged(const Message& message);
+
+    //
+    void onSessionCleared(const Message& message);
 
 private:
     // The data source and business logic.

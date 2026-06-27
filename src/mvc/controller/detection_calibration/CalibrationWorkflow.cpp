@@ -117,7 +117,7 @@ void CalibrationWorkflow::ReloadParameters()
             const std::string& pName = p->name();
             const std::string& pCat = p->category();
 
-            setupView_->MarkParameterAsDirty(pName, model_->isParameterDirty(pName, pCat));
+            setupView_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
         }
     }
 
@@ -132,7 +132,7 @@ void CalibrationWorkflow::ReloadParameters()
             const std::string& pName = p->name();
             const std::string& pCat = p->category();
 
-            setupView_->MarkParameterAsDirty(pName, model_->isParameterDirty(pName, pCat));
+            setupView_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
         }
     }
 
@@ -147,7 +147,7 @@ void CalibrationWorkflow::ReloadParameters()
             const std::string& pName = p->name();
             const std::string& pCat = p->category();
 
-            setupView_->MarkParameterAsDirty(pName, model_->isParameterDirty(pName, pCat));
+            setupView_->MarkParameterAsDirty(pName, pCat, model_->isParameterDirty(pName, pCat));
         }
     }
 
@@ -419,7 +419,7 @@ void CalibrationWorkflow::EditParam(const ParameterChangedEvent& event)
             model_->getDistortionModelParameters(), SetupPage::ParameterLocation::DISTORTION_MODEL
         );
 
-        setupView_->MarkParameterAsDirty(parameterId, model_->isParameterDirty(parameterId, categoryId));
+        setupView_->MarkParameterAsDirty(parameterId, categoryId, model_->isParameterDirty(parameterId, categoryId));
     }
 }
 
@@ -449,7 +449,7 @@ void CalibrationWorkflow::ResetParam(const ParameterEvent& event)
             model_->getDistortionModelParameters(), SetupPage::ParameterLocation::DISTORTION_MODEL
         );
 
-        setupView_->MarkParameterAsDirty(parameterId, model_->isParameterDirty(parameterId, categoryId));
+        setupView_->MarkParameterAsDirty(parameterId, categoryId, model_->isParameterDirty(parameterId, categoryId));
     }
 
     UpdateLogs(resetRes.getLogs());

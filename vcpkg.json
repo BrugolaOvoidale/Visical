@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "builtin-baseline": "0cf34c184ce990471435b5b9c92edcf7424930b1",
   "dependencies": [
-    "opencv",
+    {
+      "name": "opencv",
+      "features": [
+        "contrib"
+      ]
+    },
     "wxwidgets",
     "nlohmann-json"
   ],

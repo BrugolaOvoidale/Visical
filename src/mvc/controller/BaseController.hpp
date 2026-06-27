@@ -32,6 +32,12 @@ public:
     //-----------------------------------------------------------------------------
 
     /**
+     * @brief Performs cleanup operations before the object is destroyed.
+     * Subclasses should override this if they need to release their own resources.
+     */
+    virtual void shutdown();
+
+    /**
      * @brief Associates a logger with this model.
      * @param logger The logger instance to attach.
      */

@@ -1,4 +1,5 @@
 #include "PersistentToolTip.hpp"
+#include <wx/log.h>
 #include <wx/timer.h>
 #include <wx/panel.h>
 #include <wx/stattext.h>
@@ -7,7 +8,8 @@
 
 PersistentToolTip::PersistentToolTip(
     wxWindow* target,
-    const wxString& text)
+    const wxString& text,
+    bool isManual)
     : wxFrame(target, wxID_ANY, wxEmptyString,
     wxDefaultPosition, wxDefaultSize,
     wxFRAME_NO_TASKBAR | wxSTAY_ON_TOP | wxFRAME_TOOL_WINDOW | wxSIMPLE_BORDER),
@@ -15,9 +17,10 @@ PersistentToolTip::PersistentToolTip(
     m_delayMs(500),
     m_autoPopMs(0),
     m_reshowMs(100),
-    m_maxWidth(400),
+    m_maxWidth(600),
     m_enabled(true),
     m_wasVisible(false),
+    m_isManual(false),
     m_delayTimer(this, ID_DELAY_TIMER),
     m_autoPopTimer(this, ID_AUTOPOP_TIMER)
 {
@@ -90,6 +93,36 @@ void PersistentToolTip::SetMaxWidth(int width)
     ApplyMaxWidth();
 }
 
+void PersistentToolTip::SetManual(bool isManual)
+{
+    if (m_isManual == isManual)
+        return;
+
+    m_isManual = isManual;
+
+    if (m_isManual)
+    {
+        // Detach auto-show machinery if it was already wired up
+        if (m_isInitialized)
+        {
+            m_target->Unbind(wxEVT_ENTER_WINDOW, &PersistentToolTip::OnTargetEnter, this);
+            m_target->Unbind(wxEVT_LEAVE_WINDOW, &PersistentToolTip::OnTargetLeave, this);
+            m_isInitialized = false;
+        }
+        DismissNow();
+    }
+    else
+    {
+        // Re-arm auto-show if there is text to show
+        if (!m_text.IsEmpty() && !m_isInitialized)
+        {
+            m_target->Bind(wxEVT_ENTER_WINDOW, &PersistentToolTip::OnTargetEnter, this);
+            m_target->Bind(wxEVT_LEAVE_WINDOW, &PersistentToolTip::OnTargetLeave, this);
+            m_isInitialized = true;
+        }
+    }
+}
+
 int PersistentToolTip::GetMaxWidth() const
 {
     return m_maxWidth >= 0 ? m_maxWidth : 0;
@@ -106,18 +139,23 @@ void PersistentToolTip::SetText(const wxString& text)
     {
         DismissNow();
 
-        m_target->Unbind(wxEVT_ENTER_WINDOW, &PersistentToolTip::OnTargetEnter, this);
-        m_target->Unbind(wxEVT_LEAVE_WINDOW, &PersistentToolTip::OnTargetLeave, this);
+        if (m_isInitialized)
+        {
+            m_target->Unbind(wxEVT_ENTER_WINDOW, &PersistentToolTip::OnTargetEnter, this);
+            m_target->Unbind(wxEVT_LEAVE_WINDOW, &PersistentToolTip::OnTargetLeave, this);
 
-        m_isInitialized = false;
+            m_isInitialized = false;
+        }
 
         return;
     }
 
-    if (!m_isInitialized)
+    if (!m_isInitialized && m_target)
     {
         m_target->Bind(wxEVT_ENTER_WINDOW, &PersistentToolTip::OnTargetEnter, this);
         m_target->Bind(wxEVT_LEAVE_WINDOW, &PersistentToolTip::OnTargetLeave, this);
+
+        m_isInitialized = true;
     }
 
     ApplyMaxWidth();
@@ -128,7 +166,8 @@ void PersistentToolTip::ShowAt(const wxPoint& screenPos, const wxString& text)
     if (!IsEnabled()) return;
 
     SetText(text);
-    SetPosition(screenPos);
+
+    Move(screenPos.x + 12, screenPos.y + 12);
 
     Show();
 }
@@ -187,15 +226,13 @@ void PersistentToolTip::ApplyMaxWidth()
     Layout();
 }
 
-void PersistentToolTip::ShowTooltip()
+void PersistentToolTip::ShowTooltip(const wxPoint& screenPos)
 {
-    wxWindow* target = GetParent();
-    wxPoint pos = target->ClientToScreen(wxPoint(0, target->GetSize().y));
-    
-    SetPosition(pos);
-    
+    wxPoint clientPos = m_target->ClientToScreen(screenPos);
+    Move(clientPos.x + 12, clientPos.y + 12);
+
     Show();
-    
+
     m_wasVisible = true;
 
     int autoPop = GetAutoPop();
@@ -203,15 +240,19 @@ void PersistentToolTip::ShowTooltip()
         m_autoPopTimer.StartOnce(autoPop);
 }
 
-void PersistentToolTip::ShowNow()
+void PersistentToolTip::ShowNow(const wxPoint& screenPos)
 {
     m_autoPopTimer.Stop();
 
     int delay = m_wasVisible ? GetReshow() : GetDelay();
 
-    if (delay <= 0) ShowTooltip();
-    else            m_delayTimer.StartOnce(delay);
+    if (delay <= 0) ShowTooltip(screenPos);
+    else
+    {
+        m_delayedPos = screenPos;
 
+        m_delayTimer.StartOnce(delay);
+    }
 }
 
 void PersistentToolTip::DismissNow()
@@ -237,15 +278,13 @@ void PersistentToolTip::sOnTargetEnter(wxMouseEvent& e)
     {
         if (s_globalToolTip->GetParent() != target)
         {
-            s_globalToolTip->DismissNow();
-
             s_globalToolTip->Destroy();
 
             s_globalToolTip = nullptr;
 
             s_globalToolTip = new PersistentToolTip(target, it->second);
 
-            s_globalToolTip->ShowNow();
+            s_globalToolTip->ShowNow(e.GetPosition());
         }
     }
 
@@ -255,7 +294,7 @@ void PersistentToolTip::sOnTargetEnter(wxMouseEvent& e)
 void PersistentToolTip::OnTargetEnter(wxMouseEvent& e)
 {
     if (IsEnabled())
-        ShowNow();
+        ShowNow(e.GetPosition());
 
     e.Skip();
 }
@@ -268,7 +307,7 @@ void PersistentToolTip::OnTargetLeave(wxMouseEvent& e)
 
 void PersistentToolTip::OnDelayTimer(wxTimerEvent&)
 {
-    ShowTooltip();
+    ShowTooltip(m_delayedPos);
 }
 
 void PersistentToolTip::OnAutoPopTimer(wxTimerEvent&)
