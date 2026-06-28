@@ -1,7 +1,7 @@
 #include "ICamera.hpp"
 #include <UtilityFunctions.hpp>
 #include <parameter/ParameterUtils.hpp>
-
+#include <utility/MoveOnlyFunction.hpp>
 
 ICamera::ICamera(
     const std::string& serialNmb,
@@ -218,7 +218,7 @@ TaskEnqueueResult ICamera::stopGrab()
 }
 
 TaskEnqueueResult ICamera::takeSnapshot(
-    std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
+    MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
     int timeout)
 {
     if (!isConnected())
@@ -748,7 +748,7 @@ TaskResult ICamera::doRequestStopGrabLoop()
 }
 
 void ICamera::doTakeSnapshot(
-    std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
+    MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
     int timeout)
 {
     //

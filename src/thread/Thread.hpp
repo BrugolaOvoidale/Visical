@@ -7,7 +7,7 @@
 #include <deque>
 #include <memory>
 #include <utility>
-
+#include <utility/MoveOnlyFunction.hpp>
 
 /**
  * @brief A worker thread with an asynchronous task queue.
@@ -78,7 +78,7 @@ public:
      * @brief Enqueues a standalone function or lambda for execution.
      * @param task A move-only function to be executed.
      */
-    void enqueueTask(std::move_only_function<void()> task);
+    void enqueueTask(MoveOnlyFunction<void()> task);
 
     /**
      * @brief Enqueues a member function of a specific class instance.
@@ -110,10 +110,10 @@ private:
     std::atomic<bool> stopWorker_{ false };
 
     // Cached thread Id for quick access
-	std::thread::id threadId_;
+    std::thread::id threadId_;
 
     // Queue of pending work.
-    std::deque<std::move_only_function<void()>> taskQueue_;
+    std::deque<MoveOnlyFunction<void()>> taskQueue_;
 
     mutable std::mutex queueMutex_;
     

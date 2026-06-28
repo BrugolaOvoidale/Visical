@@ -29,7 +29,7 @@ TaskResult DetectionUtility::saveImages(
 {
     std::atomic<size_t> counter{ 0 };
 
-    std::for_each(std::execution::par, results.begin(), results.end(),
+    std::for_each(results.begin(), results.end(),
         [&](const DetectionResultMap::Entry& kv)
         {
             size_t i = counter++;
@@ -386,7 +386,7 @@ PluginDebugResultView DetectionUtility::buildContrastCheckResult(
     std::vector<size_t> compIdx(n);
     std::iota(compIdx.begin(), compIdx.end(), 0);
 
-    std::for_each(std::execution::par, compIdx.begin(), compIdx.end(),
+    std::for_each(compIdx.begin(), compIdx.end(),
         [&](size_t i)
         {
             const ConstrastCheckDebug::Mark& mark = marks[i];
@@ -438,7 +438,7 @@ PluginDebugResultView DetectionUtility::buildFocusCheckResult(
     std::vector<size_t> compIdx(n);
     std::iota(compIdx.begin(), compIdx.end(), 0);
 
-    std::for_each(std::execution::par, compIdx.begin(), compIdx.end(),
+    std::for_each(compIdx.begin(), compIdx.end(),
         [&](size_t i)
         {
             const FocusCheckDebug::Mark& mark = marks[i];
@@ -494,7 +494,7 @@ PluginDebugResultView DetectionUtility::buildIlluminationCheckResult(
     std::vector<size_t> compIdx(n);
     std::iota(compIdx.begin(), compIdx.end(), 0);
 
-    std::for_each(std::execution::par, compIdx.begin(), compIdx.end(),
+    std::for_each(compIdx.begin(), compIdx.end(),
         [&](size_t i)
         {
             const IlluminationCheckDebug::Mark& mark = marks[i];
@@ -598,7 +598,7 @@ std::optional<wxString> DetectionUtility::getContrastCheckPixelTooltip(
     std::vector<size_t> compIdx(n);
     std::iota(compIdx.begin(), compIdx.end(), 0);
 
-    std::for_each(std::execution::par, compIdx.begin(), compIdx.end(),
+    std::for_each(compIdx.begin(), compIdx.end(),
         [&](size_t i)
         {
             const ConstrastCheckDebug::Mark& mark = marks[i];
@@ -664,7 +664,7 @@ std::optional<wxString> DetectionUtility::getFocusCheckPixelTooltip(
     std::vector<size_t> compIdx(n);
     std::iota(compIdx.begin(), compIdx.end(), 0);
 
-    std::for_each(std::execution::par, compIdx.begin(), compIdx.end(),
+    std::for_each(compIdx.begin(), compIdx.end(),
         [&](size_t i)
         {
             const FocusCheckDebug::Mark& mark = marks[i];
@@ -729,7 +729,7 @@ std::optional<wxString> DetectionUtility::getIlluminationCheckPixelTooltip(
     std::vector<size_t> compIdx(n);
     std::iota(compIdx.begin(), compIdx.end(), 0);
 
-    std::for_each(std::execution::par, compIdx.begin(), compIdx.end(),
+    std::for_each(compIdx.begin(), compIdx.end(),
         [&](size_t i)
         {
             const IlluminationCheckDebug::Mark& mark = marks[i];
@@ -785,7 +785,7 @@ std::optional<wxString> DetectionUtility::getOverexposureCheckPixelTooltip(
 
     const auto& overexpPts = overexpRegion.points();
 
-    std::for_each(std::execution::par, overexpPts.begin(), overexpPts.end(),
+    std::for_each(overexpPts.begin(), overexpPts.end(),
         [&](const cv::Point& p)
         {
             if (ptFound.load())
@@ -817,7 +817,7 @@ std::optional<wxString> DetectionUtility::getOverexposureCheckPixelTooltip(
 
     const auto& boardPts = boardRegion.points();
 
-    std::for_each(std::execution::par, boardPts.begin(), boardPts.end(),
+    std::for_each(boardPts.begin(), boardPts.end(),
         [&](const cv::Point& p)
         {
             if (ptFound.load())

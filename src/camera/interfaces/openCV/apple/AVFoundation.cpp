@@ -10,7 +10,7 @@ std::vector<std::string> AVFoundation::listDeviceIds()
     AVCaptureDeviceDiscoverySession* session =
         [AVCaptureDeviceDiscoverySession
         discoverySessionWithDeviceTypes : @[AVCaptureDeviceTypeBuiltInWideAngleCamera,
-        AVCaptureDeviceTypeExternalUnknown]
+        AVCaptureDeviceTypeExternal]
         mediaType:AVMediaTypeVideo
         position : AVCaptureDevicePositionUnspecified];
 

@@ -42,13 +42,13 @@ Thread::ShutdownResult Thread::shutdown()
         // can't join self
         workerThread_.detach();
 
-		ret = ShutdownResult::DETACHED_SELF;
+        ret = ShutdownResult::DETACHED_SELF;
     }
     else if (workerThread_.joinable())
     {
         workerThread_.join();
 
-		ret = ShutdownResult::STOPPED;
+        ret = ShutdownResult::STOPPED;
     }
 
     isOn_.store(false);
@@ -76,7 +76,7 @@ void Thread::workerThreadLoop()
 {
     while (true)
     {
-        std::move_only_function<void()> task;
+        MoveOnlyFunction<void()> task;
         {
             std::unique_lock<std::mutex> lock(queueMutex_);
             queueCV_.wait(lock, [this] { return !taskQueue_.empty() || stopWorker_.load(); });
@@ -90,7 +90,9 @@ void Thread::workerThreadLoop()
         try
         {
             doingTask_.store(true);
-            task();
+            if (task) {
+                task();
+            }
         }
         catch (...)
         {
@@ -100,7 +102,7 @@ void Thread::workerThreadLoop()
     }
 }
 
-void Thread::enqueueTask(std::move_only_function<void()> task)
+void Thread::enqueueTask(MoveOnlyFunction<void()> task)
 {
     if (stopWorker_.load())
         return; // reject new tasks after shutdown

@@ -45,86 +45,83 @@ Prebuilt binaries are available for supported platforms through the GitHub Relea
 
 No compilation or dependency installation is required.
 
-<details>
-<summary><strong>Build from Source (Advanced)</strong></summary>
+## Build from Source
+This project uses CMake as its build system, with configuration managed through `CMakePresets.json`. 
 
-This project uses CMake as its build system, with configuration managed through CMakePresets.json. Dependencies are handled via vcpkg, defined in vcpkg.json.
-
-The project is primarily developed and tested with Clang, but other C++ compilers may work with minimal adjustments.
+The project is primarily developed and tested with Clang. Dependency management is handled natively: lightweight libraries (`nlohmann_json`) are fetched automatically during configuration, while heavier frameworks (OpenCV, wxWidgets) are installed via your system's package manager.
 
 ---
 
 ### Prerequisites
 
 Before building, ensure you have the following installed:
-
-- CMake (≥ 3.20 recommended)  
-- Clang (or another C++23-compatible compiler)  
-- Git  
-- vcpkg  
-
+* **CMake** (≥ 3.21 required)
+* **Clang** (or another C++23-compatible compiler)
+* **Git**
 ---
 
-### Setup vcpkg
+### Install Dependencies
 
-If vcpkg is not already installed:
-
+**Linux (Ubuntu/Debian)**
 ```bash
-git clone https://github.com/microsoft/vcpkg.git
-cd vcpkg
-./bootstrap-vcpkg.sh   # Linux
-.bootstrap-vcpkg.bat   # Windows
+sudo apt update
+sudo apt install clang ninja-build cmake libopencv-dev libwxgtk3.2-dev pkg-config
 ```
 
-Make sure that environment variable `VCPKG_ROOT` is correctly set.
+**macOS (Homebrew)**
+```bash
+brew install ninja cmake opencv wxwidgets pkg-config
+```
+
+**Windows (via MSYS2)**
+We recommend using [MSYS2](https://www.msys2.org/), which provides a Linux-like package manager (`pacman`) for Windows.
+1. Download and install MSYS2.
+2. Open the **MSYS2 CLANG64** terminal from your Start menu.
+3. Update the system and install the required tools by running:
+```bash
+pacman -Syu
+pacman -S mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja mingw-w64-clang-x86_64-pkgconf mingw-w64-clang-x86_64-opencv mingw-w64-clang-x86_64-wxwidgets
+```
 
 ---
 
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/BrugolaOvoidale/Visical.git
+git clone [https://github.com/BrugolaOvoidale/Visical.git](https://github.com/BrugolaOvoidale/Visical.git)
 cd Visical
 ```
 
 ---
 
-### Install Dependencies
-
-Dependencies are automatically resolved via vcpkg.json during CMake configuration.
-
----
-
 ### Configure & Build
 
-Using CMake presets (recommended):
-
-```bash
-cmake --preset <preset-name>
-cmake --build --preset <preset-name>
-```
+Using CMake presets is the recommended way to configure and build the project. 
 
 To list available presets:
-
 ```bash
 cmake --list-presets
 ```
 
-Alternatively, you can configure manually:
-
+**For Linux and macOS:**
 ```bash
-cmake -S . -B build -DCMAKE_TOOLCHAIN_FILE=<path-to-vcpkg>/scripts/buildsystems/vcpkg.cmake
-cmake --build build
+cmake --preset <preset-name>  # e.g., linux-release-clang or macos-release-clang
+cmake --build build/<preset-name>
+```
+
+**For Windows (inside the MSYS2 CLANG64 terminal):**
+```bash
+cmake --preset x64-release-clang
+cmake --build build/x64-release-clang
 ```
 
 ---
 
-### Notes
-
-On Linux, vcpkg may not be able to install all third-party dependencies automatically. If this happens, install the missing dependencies manually. Check the CMake configuration output for details.
-
-</details>
-
+### Optional: GenICam Support
+GenICam support via Aravis is enabled by default on Windows and Linux presets, and disabled on macOS. 
+* To compile **with** GenICam, you must install the `aravis` package via your package manager (`libaravis-dev` on apt, `aravis` on brew, or `mingw-w64-clang-x86_64-aravis` on pacman).
+* To compile **without** GenICam, append `-no-genicam` to your preset name (e.g., `cmake --preset x64-release-clang-no-genicam`).
+  
 ---
 
 # Quick Start
@@ -190,7 +187,7 @@ Visical is organized into four layers:
 - **Evaluation**: runs along both Detection and Calibration layers, evaluating quality of detected boards and calibration results. It behaves as a non-authoritative guide, giving only advice to get a good calibration, but does not block it, even if evaluations fails.
 
 <p align="center">
-  <img src="docs/assets/arch.svg">
+  <img src="docs/assets/arch.png">
 </p>
 
 ## Acquisition Layer

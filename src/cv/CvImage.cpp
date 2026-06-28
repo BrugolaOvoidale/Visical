@@ -1,7 +1,8 @@
 #include "CvImage.hpp"
 #include <execution>
 #include <opencv2/imgcodecs.hpp>
-
+#include <numeric> 
+#include <execution>
 
 CvImage::CvImage()
 {
@@ -394,7 +395,7 @@ void CvImage::minMaxGray(
         std::vector<int> indices(n);
         std::iota(indices.begin(), indices.end(), 0);
 
-        std::for_each(std::execution::par, indices.begin(), indices.end(), minMaxGrayTask);
+        std::for_each(indices.begin(), indices.end(), minMaxGrayTask);
     }
     else
     {

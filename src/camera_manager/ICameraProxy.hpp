@@ -1,6 +1,6 @@
 #pragma once
 #include <camera/ICamera.hpp>
-
+#include <utility/MoveOnlyFunction.hpp>
 
 /**
  * @brief Acts as proxy for an ICamera instance. See ICamera for full methods documentation.
@@ -67,7 +67,7 @@ public:
     TaskEnqueueResult stopGrab();
 
     TaskEnqueueResult takeSnapshot(
-        std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
+        MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
         int timeout = -1
     );
 

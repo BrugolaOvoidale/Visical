@@ -6,7 +6,7 @@
 #include "CameraStateMachine.hpp"
 #include "ICameraDefs.hpp"
 #include "ICameraInfo.hpp"
-
+#include <utility/MoveOnlyFunction.hpp>
 
 // Forward declarations
 class CvImage;
@@ -96,7 +96,7 @@ public:
      * @returns REJECTED if camera is not connected, NO_ERRORS otherwise.
      */
     TaskEnqueueResult takeSnapshot(
-        std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
+        MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
         int timeout = -1
     );
 
@@ -246,7 +246,7 @@ private:
 	// Internal struct to hold pending snapshot requests
     struct SnapshotRequest
     {
-        std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>)> func;
+        MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>)> func;
         std::chrono::steady_clock::time_point deadline;
     };
 
@@ -276,7 +276,7 @@ private:
     void finalizeGrabLoop();
 
     void doTakeSnapshot(
-        std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
+        MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
         int timeout
     );
 

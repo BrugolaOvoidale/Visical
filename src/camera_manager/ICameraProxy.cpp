@@ -1,5 +1,5 @@
 #include "ICameraProxy.hpp"
-
+#include <utility/MoveOnlyFunction.hpp>
 
 ICameraProxy::ICameraProxy(const std::shared_ptr<ICamera>& iCam)
     : iCam_(iCam)
@@ -38,7 +38,7 @@ TaskEnqueueResult ICameraProxy::stopGrab()
 }
 
 TaskEnqueueResult ICameraProxy::takeSnapshot(
-    std::move_only_function<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
+    MoveOnlyFunction<void(const TaskResultP<std::shared_ptr<const CvImage>>&)> func,
     int timeout)
 {
     return iCam_->takeSnapshot(std::move(func), timeout);

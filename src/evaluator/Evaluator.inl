@@ -257,7 +257,7 @@ std::unordered_map<std::string, std::shared_ptr<PluginResult>> Evaluator<T>::Kah
     size_t executed = 0;
     while (!ready.empty())
     {
-        std::for_each(std::execution::par, ready.begin(), ready.end(),
+        std::for_each(ready.begin(), ready.end(),
             [&](size_t i)
             {
                 const auto& plugin = g.plugins[i];

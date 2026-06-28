@@ -1,0 +1,68 @@
+name: CI Build & Valgrind Test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            preset: linux-release-clang
+          - os: macos-latest
+            preset: macos-release-clang
+          - os: windows-latest
+            preset: x64-release-clang
+    defaults:
+      run:
+        shell: ${{ matrix.os == 'windows-latest' && 'msys2 {0}' || 'bash' }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install dependencies (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ninja-build cmake libopencv-dev libwxgtk3.2-dev pkg-config valgrind xvfb
+      - name: Install dependencies (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew install llvm ninja cmake opencv wxwidgets pkg-config
+      - name: Setup MSYS2 (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+            mingw-w64-clang-x86_64-pkgconf
+            mingw-w64-clang-x86_64-opencv
+            mingw-w64-clang-x86_64-wxwidgets
+      - name: Configure CMake
+        run: cmake --preset ${{ matrix.preset }}
+      - name: Build
+        run: cmake --build build/${{ matrix.preset }}
+      - name: Run Valgrind with SIGTERM
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          xvfb-run -a valgrind --leak-check=full --show-leak-kinds=definite --error-exitcode=42 ./build/${{ matrix.preset }}/Visical &
+          APP_PID=$!
+          sleep 5
+          kill -SIGTERM $APP_PID
+          wait $APP_PID || true
+          EXIT_CODE=$?
+          if [ $EXIT_CODE -eq 42 ]; then
+            exit 1
+          else
+            exit 0
+          fi

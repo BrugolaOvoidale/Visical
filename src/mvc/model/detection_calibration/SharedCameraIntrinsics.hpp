@@ -52,6 +52,7 @@ public:
     void set(CameraIntrinsics next);
 
 private:
-    // The atomic shared pointer storage
-    std::atomic<std::shared_ptr<CameraIntrinsics>> current_;
+    // The non atomic shared pointer storage
+    std::shared_ptr<CameraIntrinsics> current_;
+    mutable std::recursive_mutex* currentMutex_;
 };
