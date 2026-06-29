@@ -266,14 +266,14 @@ wxPanel* CalibrationPage::CreateSetupCalibrationTab(wxWindow* parent)
     wxBoxSizer* modelParamsSizer = new wxBoxSizer(wxHORIZONTAL);
 
     m_loadModelParams = new wxBitmapButton(panel, wxID_ANY, openBitmap);
-    m_loadModelParams->SetToolTip("Load model parameters");
+    m_loadModelParams->SetToolTip("Load Calibration parameters");
     m_loadModelParams->Bind(wxEVT_BUTTON, &CalibrationPage::OnLoadModelConfig, this);
 
     modelParamsSizer->Add(m_loadModelParams, 0);
 
 
     m_saveModelParams = new wxBitmapButton(panel, wxID_ANY, saveBitmap);
-    m_saveModelParams->SetToolTip("Save model parameters to file");
+    m_saveModelParams->SetToolTip("Save Calibration parameters to file");
     m_saveModelParams->Bind(wxEVT_BUTTON, &CalibrationPage::OnSaveModelConfig, this);
     modelParamsSizer->Add(m_saveModelParams, 0);
 

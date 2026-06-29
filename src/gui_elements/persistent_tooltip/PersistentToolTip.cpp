@@ -4,6 +4,7 @@
 #include <wx/panel.h>
 #include <wx/stattext.h>
 #include <wx/sizer.h>
+#include <wx/display.h>
 
 
 PersistentToolTip::PersistentToolTip(
@@ -229,8 +230,24 @@ void PersistentToolTip::ApplyMaxWidth()
 void PersistentToolTip::ShowTooltip(const wxPoint& screenPos)
 {
     wxPoint clientPos = m_target->ClientToScreen(screenPos);
-    Move(clientPos.x + 12, clientPos.y + 12);
+    wxPoint pos(clientPos.x + 12, clientPos.y + 12);
 
+    // Clamp position so tooltip stays within the display
+    wxDisplay display(wxDisplay::GetFromPoint(pos));
+    wxRect displayRect = display.GetClientArea();
+    int tipWidth = GetMaxWidth();
+    int tipHeight = GetSize().GetHeight();
+
+    if (pos.x + tipWidth > displayRect.GetRight())
+        pos.x = displayRect.GetRight() - tipWidth - 12;  // flip to left of cursor
+    if (pos.y + tipHeight > displayRect.GetBottom())
+        pos.y = displayRect.GetBottom() - tipHeight - 12; // flip to above cursor
+
+    // Final clamp to display edges (in case flip also goes out of bounds)
+    pos.x = std::clamp(pos.x, displayRect.GetLeft(), displayRect.GetRight() - tipWidth);
+    pos.y = std::clamp(pos.y, displayRect.GetTop(), displayRect.GetBottom() - tipHeight);
+
+    Move(pos);
     Show();
 
     m_wasVisible = true;

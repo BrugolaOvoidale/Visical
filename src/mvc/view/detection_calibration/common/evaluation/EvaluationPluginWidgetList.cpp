@@ -126,6 +126,8 @@ void EvaluationPluginWidgetList::CloseLastParametersFrame()
     // Deselect previous
     if (m_lastParamsFrame)
         m_lastParamsFrame->CloseParametersFrame();
+
+    m_lastParamsFrame = nullptr;
 }
 
 //////////////////////////////////////////////////////////////////////////

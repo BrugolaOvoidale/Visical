@@ -22,6 +22,7 @@ public:
      */
     struct Loaded {
         DetectionPage::ImageSource imgSrc;
+        bool autoCapture;
         bool drawBoard;
         bool drawMarks;
         bool drawWCS;
@@ -55,6 +56,7 @@ public:
     /**
      * @brief Persists the provided settings to the local JSON configuration file.
      * @param imgSrc Image source.
+     * @param autoCapture flag for auto capture results.
      * @param drawBoard flag for board contour visualization.
      * @param drawMarks flag for mark visualization.
      * @param drawWCS flag for coordinate system visualization.
@@ -62,6 +64,7 @@ public:
      */
     TaskResult saveSettings(
         DetectionPage::ImageSource imgSrc,
+        bool autoCapture,
         bool drawBoard,
         bool drawMarks,
         bool drawWCS

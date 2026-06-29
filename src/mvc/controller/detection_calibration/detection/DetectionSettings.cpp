@@ -60,6 +60,8 @@ TaskResultP<DetectionSettings::Loaded> DetectionSettings::loadSettings()
 
         res.imgSrc = UtilityFunctions::enumFromString<DetectionPage::ImageSource>(d.at("image_source")).value();
 
+        res.autoCapture = d.at("auto_capture");
+
         res.drawBoard = d.at("draw_board");
 
         res.drawMarks = d.at("draw_marks");
@@ -100,6 +102,7 @@ TaskResultP<DetectionSettings::Loaded> DetectionSettings::loadSettings()
 
 TaskResult DetectionSettings::saveSettings(
     DetectionPage::ImageSource imgSrc,
+    bool autoCapture,
     bool drawBoard,
     bool drawMarks,
     bool drawWCS) const
@@ -111,6 +114,7 @@ TaskResult DetectionSettings::saveSettings(
         // Build detection section
         j["detection"] = {
             {"image_source", UtilityFunctions::stringFromEnum(imgSrc).value()},
+            {"auto_capture", autoCapture},
             {"draw_board", drawBoard},
             {"draw_marks", drawMarks},
             {"draw_WCS", drawWCS},

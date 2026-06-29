@@ -60,7 +60,7 @@ public:
 
     /**
      * @brief Signals the worker thread to stop and waits for it to join.
-     * All remaining tasks will be drained befor the thread is joined.
+     * All remaining tasks will be drained before the thread is joined.
      * @return ShutdownResult indicating how the thread was terminated.
      */
     ShutdownResult shutdown();

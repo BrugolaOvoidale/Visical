@@ -137,6 +137,10 @@ private:
     void LiveCamera();
     void OnLiveCamera(const wxCommandEvent& event);
 
+    // Live camera acquisition
+    void AutoCapture(const wxCommandEvent& event);
+    void OnAutoCapture(const wxCommandEvent& event);
+
     // Show plugin debug result
     void ShowPerBoardDebugResult(const wxCommandEvent& event);
     void OnShowPerBoardDebugResult(const wxCommandEvent& event);

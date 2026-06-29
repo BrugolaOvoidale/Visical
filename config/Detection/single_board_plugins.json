@@ -26,9 +26,6 @@
                 "min_marks_count": {
                     "value": 4
                 },
-                "kernel_size": {
-                    "value": 5.5
-                },
                 "sigma": {
                     "value": 0.7
                 },

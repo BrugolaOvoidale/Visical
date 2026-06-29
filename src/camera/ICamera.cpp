@@ -881,7 +881,11 @@ void ICamera::doNextGrab(
     {
         if (req.deadline < now)
         {
-            req.func( { std::nullopt, { "Snapshot request timeout", Log::Level::LVL_ERROR } } );
+            std::vector<Log> exitLogs = acqResult.takeLogs();
+
+            exitLogs.push_back({ "Snapshot request timeout", Log::Level::LVL_ERROR });
+
+            req.func( { std::nullopt, std::move(exitLogs) });
         }
         else
         {

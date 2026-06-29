@@ -126,6 +126,9 @@ public:
     /** @brief Returns active operational configuration origins. */
     ImageSource GetImageSource() const;
 
+    /** @brief Sets Auto Capture value. */
+    void SetAutoCapture(bool checked);
+
     /** @brief Forces selection highlight onto a specific board item. */
     void SelectBoard(std::uint32_t id) override;
 
@@ -201,6 +204,8 @@ private:
 
     void OnLive(wxCommandEvent& event);
 
+    void OnAutoCapture(wxCommandEvent& event);
+
     void OnSaveAllBoards(wxCommandEvent& event);
 
     void OnImagePreProcess(wxCommandEvent& event);
@@ -229,6 +234,8 @@ private:
     wxButton* m_snapBtn;
 
     wxCheckBox* m_liveCheckBox;
+
+    wxCheckBox* m_autoCaptureCheckBox;
 
     wxStaticText* m_deviceLabel;
 

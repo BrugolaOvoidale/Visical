@@ -172,6 +172,7 @@ void DetectionController::init(const std::shared_ptr<CameraManager>& cameraManag
 
     view_->Bind(GUI_SNAP_CAMERA, &DetectionController::OnSnap, this);
     view_->Bind(GUI_LIVE_CAMERA, &DetectionController::OnLiveCamera, this);
+    view_->Bind(GUI_AUTO_CAPTURE, &DetectionController::OnAutoCapture, this);
 
     view_->Bind(GUI_DET_REMOVE_BOARD, &DetectionController::OnRemoveBoard, this);
     view_->Bind(GUI_DET_REMOVE_ALL_BOARDS, &DetectionController::OnRemoveAllBoards, this);
@@ -314,7 +315,12 @@ void DetectionController::OnUiTick()
 
     if (model_->isLiveSession())
     {
-        utils_->cook({ DetectionResultMap::Id(0), model_->getLatestLiveDetectionResult() });
+        std::shared_ptr<DetectionResult> liveDetRes = model_->getLatestLiveDetectionResult();
+
+        if (liveDetRes)
+        {
+            utils_->cook({ DetectionResultMap::Id(0), liveDetRes });
+        }
     }
 
     std::optional<DetectionUtility::Mail> res = utils_->takeHighPriority();
@@ -495,6 +501,9 @@ void DetectionController::doLoadSettingsImpl()
 
         view_->SetImageSource(imgSrc);
 
+        view_->SetAutoCapture(payload.autoCapture);
+        model_->setAutoCapture(payload.autoCapture);
+
         view_->DrawBoard(payload.drawBoard);
         view_->DrawMarks(payload.drawMarks);
         view_->DrawWCS(payload.drawWCS);
@@ -510,6 +519,7 @@ void DetectionController::doSaveSettingsImpl()
 {
     TaskResult res = settings_->saveSettings(
         view_->GetImageSource(),
+        model_->getAutoCapture(),
         view_->IsDrawBoardEnabled(),
         view_->IsDrawMarksEnabled(),
         view_->IsDrawWCSEnabled()
@@ -927,6 +937,19 @@ void DetectionController::LiveCamera()
 void DetectionController::OnLiveCamera(const wxCommandEvent& event)
 {
     LiveCamera();
+}
+
+//
+void DetectionController::AutoCapture(const wxCommandEvent& event)
+{
+    model_->setAutoCapture(
+        static_cast<bool>(event.GetInt())
+    );
+}
+
+void DetectionController::OnAutoCapture(const wxCommandEvent& event)
+{
+    AutoCapture(event);
 }
 
 //
@@ -1586,7 +1609,15 @@ void DetectionController::onBoardReEvaluation(const MessageTask& message)
 //
 void DetectionController::boardStored(const MessageP<DetectionResultMap::Entry>& message)
 {
-    utils_->cook(message.getPayload());
+    const DetectionResultMap::Entry& payload = message.getPayload();
+
+    // If a board is stored during a live session, it means it came from
+    // AutoCapture feature, so we avoid 'cooking' (and later rendering on OnUiTick),
+    // to prevent flickering with Live frames
+    if (model_->isSessionOn() && model_->isLiveSession())
+        UpdateBoard(payload.first.get(), payload.second);
+    else
+        utils_->cook(payload);
 
     UpdateLogsMessage(message);
 }

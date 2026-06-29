@@ -111,6 +111,7 @@ void SetupPage::CreateTab()
     wxStaticBoxSizer* modeBriefingBox = new wxStaticBoxSizer(wxVERTICAL, this, "Mode birefing");
 
     wxScrolledWindow* scrolled = new wxScrolledWindow(this, wxID_ANY);
+    scrolled->SetMinSize(FromDIP(wxSize(-1, 200)));
     scrolled->SetScrollRate(5, 5);
 
     m_modeBriefing = new wxStaticText(scrolled, wxID_ANY, wxEmptyString);

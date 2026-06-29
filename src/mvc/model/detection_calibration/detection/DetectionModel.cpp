@@ -20,6 +20,8 @@
 #include "board/EvaluatedBoard.hpp"
 #include "board_sequence/BoardSequencePlugins.hpp"
 #include "board_sequence/EvaluatedBoardSequence.hpp"
+#include "board_sequence/plugins/FOVCoverageCheck/FOVCoverageCheck.hpp"
+#include "board_sequence/plugins/ImagesCountCheck/ImagesCountCheck.hpp"
 #include "../SharedCameraIntrinsics.hpp"
 
 
@@ -181,6 +183,16 @@ TaskEnqueueResult DetectionModel::startCameraSession(
     return res;
 }
 
+void DetectionModel::setAutoCapture(bool enabled)
+{
+    autoCapture_.store(enabled);
+}
+
+bool DetectionModel::getAutoCapture() const
+{
+    return autoCapture_.load();
+}
+
 TaskEnqueueResult DetectionModel::stopSession()
 {
     // Check if a session is On
@@ -301,7 +313,7 @@ std::map<DetectionResultMap::Id, std::shared_ptr<const CvImage>> DetectionModel:
     return originalImages_;
 }
 
-const std::shared_ptr<EvaluatedBoardSequence>& DetectionModel::getEvaluatedSequence()
+std::shared_ptr<EvaluatedBoardSequence> DetectionModel::getEvaluatedSequence()
 {
     std::shared_lock lock(lastEvalSequenceMutex_);
 
@@ -714,6 +726,15 @@ void DetectionModel::finalizeLiveDetectionLoop(const std::shared_ptr<ICameraProx
 
     requestStopSession_.store(false);
 
+    {
+        std::unique_lock lock(liveResultsMutex_);
+        liveQueue_.clear();
+        liveMap_.clear();
+
+        liveOrigImgsQueue_.clear();
+        liveOrigImgsMap_.clear();
+    }
+
     publish(MessageTask::success(MSG_BOARD_FROM_LIVE));
 
     UpdateLogs(stopCamGrab.takeLogs());
@@ -1036,6 +1057,14 @@ void DetectionModel::doFindBoardFromLive(
 
     if (!requestStopSession_.load())
     {
+        if (getAutoCapture())
+        {
+            checkAutoCapture(
+                evalBoard,
+                originalImage
+            );
+        }
+
         storeLiveDetectionResult(
             std::make_shared<DetectionResultLive>(evalBoard),
             originalImage
@@ -1262,16 +1291,25 @@ TaskResult DetectionModel::doReEvaluateAllBoardsSingleCheck(
     return true;
 }
 
-TaskResultP<std::shared_ptr<EvaluatedBoardSequence>> DetectionModel::doReEvaluateSequence()
+std::shared_ptr<EvaluatedBoardSequence> DetectionModel::makeSequenceEvaluation() const
 {
     const std::vector<std::shared_ptr<EvaluatedBoard>> evalBoards = getDetectedBoards();
+
     std::vector<std::shared_ptr<Board>> detectedBoards;
     detectedBoards.reserve(evalBoards.size());
+
     for (const auto& e : evalBoards) detectedBoards.push_back(e->object());
 
     std::shared_ptr<EvaluatedBoardSequence> newEval = std::make_shared<EvaluatedBoardSequence>(
         std::move(boardSeqEval_->evaluate(detectedBoards))
     );
+
+    return newEval;
+}
+
+TaskResultP<std::shared_ptr<EvaluatedBoardSequence>> DetectionModel::doReEvaluateSequence()
+{
+    std::shared_ptr<EvaluatedBoardSequence> newEval = makeSequenceEvaluation();
 
     storeLatestEvaluatedSequence(newEval);
 
@@ -1304,26 +1342,12 @@ TaskResultP<std::shared_ptr<EvaluatedBoardSequence>> DetectionModel::doReEvaluat
         }
         else
         {
-            const std::vector<std::shared_ptr<EvaluatedBoard>> evalBoards = getDetectedBoards();
-            std::vector<std::shared_ptr<Board>> detectedBoards;
-            detectedBoards.reserve(evalBoards.size());
-            for (const auto& e : evalBoards) detectedBoards.push_back(e->object());
-
-            std::shared_ptr<EvaluatedBoardSequence> newEval = std::make_shared<EvaluatedBoardSequence>(
-                std::move(boardSeqEval_->evaluate(detectedBoards))
-            );
+            newEval = makeSequenceEvaluation();
         }
     }
     else
     {
-        const std::vector<std::shared_ptr<EvaluatedBoard>> evalBoards = getDetectedBoards();
-        std::vector<std::shared_ptr<Board>> detectedBoards;
-        detectedBoards.reserve(evalBoards.size());
-        for (const auto& e : evalBoards) detectedBoards.push_back(e->object());
-
-        std::shared_ptr<EvaluatedBoardSequence> newEval = std::make_shared<EvaluatedBoardSequence>(
-            std::move(boardSeqEval_->evaluate(detectedBoards))
-        );
+        newEval = makeSequenceEvaluation();
     }
 
     storeLatestEvaluatedSequence(newEval);
@@ -1435,6 +1459,112 @@ void DetectionModel::storeLiveDetectionResult(
 
     liveOrigImgsQueue_.push_back(originalImage);
     liveOrigImgsMap_[liveBoard->id()] = originalImage;
+}
+
+bool DetectionModel::checkAutoCapture(
+    const std::shared_ptr<EvaluatedBoard>& evalBoard,
+    const std::shared_ptr<const CvImage>& originalImage)
+{
+    if (evalBoard->status() != EvaluatedBoard::Status::GOOD)
+        return false;
+
+    // Old evaluation
+    const std::shared_ptr<EvaluatedBoardSequence> oldEval = getEvaluatedSequence();
+
+    if (oldEval && oldEval->status() == EvaluatedBoardSequence::Status::GOOD)
+        return false;
+
+    // New evaluation
+    std::shared_ptr<EvaluatedBoardSequence> newEval;
+    {
+        const std::vector<std::shared_ptr<EvaluatedBoard>> evalBoards = getDetectedBoards();
+
+        std::vector<std::shared_ptr<Board>> detectedBoards;
+        detectedBoards.reserve(evalBoards.size() + 1);
+
+        detectedBoards.push_back(evalBoard->object());
+
+        for (const auto& e : evalBoards) detectedBoards.push_back(e->object());
+
+        newEval = std::make_shared<EvaluatedBoardSequence>(
+            std::move(boardSeqEval_->evaluate(detectedBoards))
+        );
+    }
+
+    if (!oldEval)
+    {
+        storeDetectionResult(
+            std::make_shared<DetectionResultSnap>(evalBoard),
+            originalImage
+        );
+
+        storeLatestEvaluatedSequence(newEval);
+
+        return true;
+    }
+
+    const std::vector<std::shared_ptr<PluginResult>>& oldAssessments = oldEval->assessments();
+
+    const std::vector<std::shared_ptr<PluginResult>>& newAssessments = newEval->assessments();
+
+    bool acceptNewBoard = false;
+    bool onlyImageCountChanged = true;
+    bool hasRealProgress = false;
+    bool imagesGotBetter = false;
+
+    auto getPrevious = [&](const auto& result)
+        -> std::shared_ptr<PluginResult>
+        {
+            auto found = std::find_if(
+                oldAssessments.begin(),
+                oldAssessments.end(),
+                [&](const auto& candidate)
+                {
+                    return candidate->plugin()->id() == result->plugin()->id();
+                });
+
+            return found != oldAssessments.end() ? *found : nullptr;
+        };
+
+    for (const auto& result : newAssessments)
+    {
+        auto previousResult = getPrevious(result);
+
+        if (!previousResult)
+            continue;
+
+        const bool wasNotOk = previousResult->severity() != EvaluationSeverity::OK;
+
+        const bool isNotOk = result->severity() != EvaluationSeverity::OK;
+
+        if (result->plugin()->id() == ImagesCountCheck::ID)
+        {
+            if (wasNotOk)
+                imagesGotBetter = result->score() > previousResult->score();
+
+            continue;
+        }
+
+        if (isNotOk)
+            onlyImageCountChanged = false;
+
+        if (wasNotOk && result->score() - previousResult->score() > 0.1)
+            hasRealProgress = true;
+    }
+
+    acceptNewBoard = hasRealProgress || (onlyImageCountChanged && imagesGotBetter);
+
+    if (acceptNewBoard)
+    {
+        storeDetectionResult(
+            std::make_shared<DetectionResultSnap>(evalBoard),
+            originalImage
+        );
+
+        storeLatestEvaluatedSequence(newEval);
+    }
+
+    return acceptNewBoard;
 }
 
 void DetectionModel::evictExpiredLiveDetectionResults(const std::chrono::steady_clock::time_point& now)

@@ -97,6 +97,15 @@ public:
     );
 
     /** 
+     * @brief If true, detected boards during a Live session that passed all evaluation checks,
+     * are automatically stored.
+     */
+    void setAutoCapture(bool enabled);
+
+    /** @brief Returns true if Auto Capture feature is enabled. */
+    bool getAutoCapture() const;
+
+    /** 
      * @brief Requests the termination of the current session.
      * @returns ALREADY_DONE if session is not running, ALREADY_ACTIVE if a stop request is in progress, NO_ERRORS otherwise.
      */
@@ -139,7 +148,7 @@ public:
     std::map<DetectionResultMap::Id, std::shared_ptr<const CvImage>> getAllOriginalImages() const;
 
     /** @brief Gets the result of the latest sequence evaluation. */
-    const std::shared_ptr<EvaluatedBoardSequence>& getEvaluatedSequence();
+    std::shared_ptr<EvaluatedBoardSequence> getEvaluatedSequence();
 
     /** @brief Returns the count of total detections in the current session. */
     size_t countDetectionResults() const;
@@ -268,6 +277,9 @@ private:
         bool enabled
     );
     
+    // Create a detected board sequence evaluation.
+    std::shared_ptr<EvaluatedBoardSequence> makeSequenceEvaluation() const;
+
     // Implementation of re-evaluation sequence logic.
     TaskResultP<std::shared_ptr<EvaluatedBoardSequence>> doReEvaluateSequence();
 
@@ -299,6 +311,13 @@ private:
     // associating it with its global DetectionResult Id.
     void storeLiveDetectionResult(
         const std::shared_ptr<DetectionResult>& result,
+        const std::shared_ptr<const CvImage>& originalImage
+    );
+
+    // Automatically store detected boards during a Live session that passed all evaluation checks.
+    // Return true if board is stored.
+    bool checkAutoCapture(
+        const std::shared_ptr<EvaluatedBoard>& evalBoard,
         const std::shared_ptr<const CvImage>& originalImage
     );
 
@@ -349,6 +368,9 @@ private:
 
 	// Control flag to indicate if a session termination is requested.
     std::atomic<bool> requestStopSession_{ false };
+
+	// Control flag to indicate if a the Auto Capture feature is enabled.
+    std::atomic<bool> autoCapture_{ false };
 
     // Control flag for the re-run boards request
     std::atomic<bool> rerunRequested_{ false };

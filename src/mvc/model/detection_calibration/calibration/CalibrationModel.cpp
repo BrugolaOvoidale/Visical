@@ -357,7 +357,9 @@ void CalibrationModel::validateCalibrationParameters()
 
             std::shared_ptr<Parameter> initialGuess = getCurrentWritableParam("use_initial_guess", CalibrationParametersRegistry::CATEGORY);
             initialGuess->resetImposedAccessMode();
-            initialGuess->setValue<bool>(true);
+            initialGuess->setValue<bool>(
+                getDefaultParameter("use_initial_guess", CalibrationParametersRegistry::CATEGORY)->getValue<bool>()
+            );
 
             getCurrentWritableParam("tangential_distortion_mode", CalibrationParametersRegistry::CATEGORY)->resetImposedAccessMode();
 

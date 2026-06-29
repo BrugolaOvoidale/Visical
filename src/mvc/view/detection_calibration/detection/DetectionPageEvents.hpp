@@ -14,6 +14,9 @@ wxDECLARE_EVENT(GUI_SNAP_CAMERA, wxCommandEvent);
 // Payload: none
 wxDECLARE_EVENT(GUI_LIVE_CAMERA, wxCommandEvent);
 
+// Payload: int [0, 1] -> if button check
+wxDECLARE_EVENT(GUI_AUTO_CAPTURE, wxCommandEvent);
+
 // Payload: none
 wxDECLARE_EVENT(GUI_DET_REMOVE_BOARD, BoardEvent);
 

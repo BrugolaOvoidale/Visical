@@ -717,7 +717,7 @@ void CalibrationStageController::EditPluginParam(const ParameterChangedEvent& ev
         view_->UpdatePlugin(plugin);
     }
 
-    view_->MarkPluginParameterAsDirty(pluginId, categoryId, parameterId, plugin->isParameterDirty(parameterId, categoryId));
+    view_->MarkPluginParameterAsDirty(pluginId, parameterId, categoryId, plugin->isParameterDirty(parameterId, categoryId));
 }
 
 void CalibrationStageController::OnEditPluginParam(ParameterChangedEvent& event)
@@ -740,7 +740,7 @@ void CalibrationStageController::ResetPluginParam(const ParameterEvent& event)
     if (resetRes.isSuccess())
     {
         view_->UpdatePlugin(plugin);
-        view_->MarkPluginParameterAsDirty(pluginId, categoryId, parameterId, plugin->isParameterDirty(parameterId, categoryId));
+        view_->MarkPluginParameterAsDirty(pluginId, parameterId, categoryId, plugin->isParameterDirty(parameterId, categoryId));
     }
 
     UpdateLogs(resetRes.takeLogs());

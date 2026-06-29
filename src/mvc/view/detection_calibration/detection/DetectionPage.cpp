@@ -263,6 +263,11 @@ DetectionPage::ImageSource DetectionPage::GetImageSource() const
     return m_imgSrc;
 }
 
+void DetectionPage::SetAutoCapture(bool checked)
+{
+    m_autoCaptureCheckBox->SetValue(checked);
+}
+
 void DetectionPage::SelectBoard(std::uint32_t id)
 {
     CalibrationStageView::SelectBoard(id);
@@ -300,7 +305,7 @@ wxPanel* DetectionPage::CreateSetupDetectionTab(wxWindow* parent)
 
     wxBitmap openBitmap(wxImage("resources/open.png", wxBITMAP_TYPE_PNG).Rescale(18, 18));
     m_loadConfig = new wxBitmapButton(panel, wxID_ANY, openBitmap);
-    m_loadConfig->SetToolTip("Load detection parameters");
+    m_loadConfig->SetToolTip("Load Detection settings");
     m_loadConfig->Bind(wxEVT_BUTTON, &DetectionPage::OnLoadSettings, this);
 
     settingsSizer->Add(m_loadConfig, 0);
@@ -308,7 +313,7 @@ wxPanel* DetectionPage::CreateSetupDetectionTab(wxWindow* parent)
 
     wxBitmap saveBitmap(wxImage("resources/save.png", wxBITMAP_TYPE_PNG).Rescale(18, 18));
     m_saveConfig = new wxBitmapButton(panel, wxID_ANY, saveBitmap);
-    m_saveConfig->SetToolTip("Save detection parameters to file");
+    m_saveConfig->SetToolTip("Save Detection settings to file");
     m_saveConfig->Bind(wxEVT_BUTTON, &DetectionPage::OnSaveSettings, this);
     settingsSizer->Add(m_saveConfig, 0);
 
@@ -345,14 +350,14 @@ wxPanel* DetectionPage::CreateSetupDetectionTab(wxWindow* parent)
     wxBoxSizer* modelParamsSizer = new wxBoxSizer(wxHORIZONTAL);
 
     m_loadModelParams = new wxBitmapButton(panel, wxID_ANY, openBitmap);
-    m_loadModelParams->SetToolTip("Load model parameters");
+    m_loadModelParams->SetToolTip("Load Detection parameters");
     m_loadModelParams->Bind(wxEVT_BUTTON, &DetectionPage::OnLoadModelConfig, this);
 
     modelParamsSizer->Add(m_loadModelParams, 0);
 
 
     m_saveModelParams = new wxBitmapButton(panel, wxID_ANY, saveBitmap);
-    m_saveModelParams->SetToolTip("Save model parameters to file");
+    m_saveModelParams->SetToolTip("Save Detection parameters to file");
     m_saveModelParams->Bind(wxEVT_BUTTON, &DetectionPage::OnSaveModelConfig, this);
     modelParamsSizer->Add(m_saveModelParams, 0);
 
@@ -610,14 +615,21 @@ wxPanel* DetectionPage::CreateFeedPanel(wxWindow* parent)
     m_snapBtn = new wxButton(panel, wxID_ANY, "Snap");
     m_snapBtn->Bind(wxEVT_BUTTON, &DetectionPage::OnSnap, this);
 
-
     m_liveCheckBox = new wxCheckBox(panel, wxID_ANY, "Live Camera");
-    m_liveCheckBox->Enable();
     m_liveCheckBox->Bind(wxEVT_CHECKBOX, &DetectionPage::OnLive, this);
 
+    m_autoCaptureCheckBox = new wxCheckBox(panel, wxID_ANY, "Auto capture");
+    m_autoCaptureCheckBox->Bind(wxEVT_CHECKBOX, &DetectionPage::OnAutoCapture, this);
+    PersistentToolTip::SetToolTip(
+        m_autoCaptureCheckBox,
+        "Each detected board with no evaluation issues,"
+        "will be captured if they will make a score"
+        "contribution of at least 0.1 % in a per-sequence evaluation check"
+    );
 
     btnSizer->Add(m_snapBtn, 0, wxALL | wxALIGN_CENTER_VERTICAL, 0);
     btnSizer->Add(m_liveCheckBox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 0);
+    btnSizer->Add(m_autoCaptureCheckBox, 0, wxALL | wxALIGN_CENTER_VERTICAL, 0);
     //
 
 
@@ -683,6 +695,9 @@ void DetectionPage::UpdateCameraFeedBtns()
 
     if (m_liveCheckBox->IsEnabled() != enable)
         m_liveCheckBox->Enable(enable);
+
+    if (m_autoCaptureCheckBox->IsEnabled() != enable)
+        m_autoCaptureCheckBox->Enable(enable);
 }
 
 void DetectionPage::IdleMode()
@@ -776,6 +791,8 @@ void DetectionPage::StopLiveMode()
 void DetectionPage::LiveMode()
 {
     IdleMode();
+
+    m_devicesList->Disable();
 
     m_feedTxt->SetLabel("LIVE");
 
@@ -886,6 +903,8 @@ void DetectionPage::ImgAcqAssistantUIMode()
 
     m_liveCheckBox->Show();
 
+    m_autoCaptureCheckBox->Show();
+
     m_loadImgBtn->Hide();
     //
 
@@ -906,6 +925,8 @@ void DetectionPage::LoadImagesUIMode()
     m_snapBtn->Hide();
 
     m_liveCheckBox->Hide();
+
+    m_autoCaptureCheckBox->Hide();
 
     m_loadImgBtn->Show();
     //
@@ -1000,6 +1021,16 @@ void DetectionPage::OnLive(wxCommandEvent& event)
 {
     // Let the parent know this board was clicked
     wxCommandEvent evt(GUI_LIVE_CAMERA, GetId());
+
+    // Send it to parent
+    ProcessEvent(evt);         // sends to this and upwards
+}
+
+void DetectionPage::OnAutoCapture(wxCommandEvent& event)
+{
+    // Let the parent know this board was clicked
+    wxCommandEvent evt(GUI_AUTO_CAPTURE, GetId());
+    evt.SetInt(m_autoCaptureCheckBox->GetValue());
 
     // Send it to parent
     ProcessEvent(evt);         // sends to this and upwards
